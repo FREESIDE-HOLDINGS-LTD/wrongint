@@ -45,7 +45,7 @@ export default defineComponent({
   computed: {
     ticker(): TickerItem[] {
       return [
-        { label: 'WRONGINT::GLOBAL', value: latestOf(this.global) },
+        { label: 'GLOBAL', value: latestOf(this.global) },
         { label: 'HACKERNEWS', value: latestOf(this.hackernews) },
         { label: 'LOBSTERS', value: latestOf(this.lobsters) },
       ]
