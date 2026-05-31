@@ -1,4 +1,5 @@
 use crate::app;
+use crate::app::Transactor;
 use crate::domain::time::DateTime;
 use crate::domain::{
     Points, Post, PostComments, PostId, PostScore, PostTitle, PostUrl, Snapshot, Source, SourceId,
@@ -207,6 +208,39 @@ impl TryFrom<PersistedSource> for Source {
 }
 
 impl Database {
+    fn read_source(&self, id: SourceId) -> Result<Source> {
+        let key = vec![source_to_u8(id)];
+
+        let read_txn = self.db.begin_read()?;
+        let table = match read_txn.open_table(SOURCES) {
+            Ok(t) => t,
+            Err(redb::TableError::TableDoesNotExist(_)) => {
+                return Ok(Source::new(id, None, None));
+            }
+            Err(e) => return Err(e.into()),
+        };
+
+        match table.get(key.as_slice())? {
+            Some(value) => {
+                let persisted: PersistedSource = serde_json::from_slice(value.value())?;
+                persisted.try_into()
+            }
+            None => Ok(Source::new(id, None, None)),
+        }
+    }
+
+    fn read_in_range(
+        &self,
+        source: SourceId,
+        from: DateTime,
+        to: DateTime,
+    ) -> Result<Vec<Snapshot>> {
+        let s = source_to_u8(source);
+        let lower = time_prefix(s, from.unix_timestamp());
+        let upper = time_prefix(s, to.unix_timestamp().saturating_add(1));
+        self.snapshots_in_key_range(source, &lower, &upper)
+    }
+
     /// Read the capture key range, grouping consecutive posts that share a
     /// `captured_at` (unix) into one [`Snapshot`]. Keys sort by (source, unix,
     /// post_id), so a single snapshot's posts are always contiguous.
@@ -265,62 +299,89 @@ impl Database {
 
 impl app::SnapshotRepository for Database {
     fn save(&self, snapshot: &Snapshot) -> Result<()> {
-        let source = source_to_u8(snapshot.source());
-        let unix = snapshot.captured_at().unix_timestamp();
-
-        let write_txn = self.db.begin_write()?;
-        {
-            let mut captures = write_txn.open_table(CAPTURES)?;
-            for post in snapshot.posts() {
-                let key = capture_key(source, unix, post.post_id().as_str());
-                let value = serde_json::to_vec(&PersistedPost::from(post))?;
-                captures.insert(key.as_slice(), value.as_slice())?;
-            }
-        }
-        write_txn.commit()?;
-        Ok(())
+        self.execute(|uow| uow.snapshots().save(snapshot))
     }
 
     fn in_range(&self, source: SourceId, from: DateTime, to: DateTime) -> Result<Vec<Snapshot>> {
-        let s = source_to_u8(source);
-        let lower = time_prefix(s, from.unix_timestamp());
-        let upper = time_prefix(s, to.unix_timestamp().saturating_add(1));
-        self.snapshots_in_key_range(source, &lower, &upper)
+        self.read_in_range(source, from, to)
     }
 }
 
 impl app::SourceRepository for Database {
     fn get(&self, id: SourceId) -> Result<Source> {
-        let key = vec![source_to_u8(id)];
+        self.read_source(id)
+    }
 
-        let read_txn = self.db.begin_read()?;
-        let table = match read_txn.open_table(SOURCES) {
-            Ok(t) => t,
-            Err(redb::TableError::TableDoesNotExist(_)) => {
-                return Ok(Source::new(id, None, None));
-            }
-            Err(e) => return Err(e.into()),
-        };
+    fn save(&self, source: &Source) -> Result<()> {
+        self.execute(|uow| uow.sources().save(source))
+    }
+}
 
-        match table.get(key.as_slice())? {
-            Some(value) => {
-                let persisted: PersistedSource = serde_json::from_slice(value.value())?;
-                persisted.try_into()
+impl app::Transactor for Database {
+    fn execute<F, T>(&self, work: F) -> Result<T>
+    where
+        F: FnOnce(&dyn app::UnitOfWork) -> Result<T>,
+    {
+        let txn = self.db.begin_write()?;
+        let result = work(&RedbUnitOfWork {
+            db: self,
+            txn: &txn,
+        });
+        match result {
+            Ok(value) => {
+                txn.commit()?;
+                Ok(value)
             }
-            None => Ok(Source::new(id, None, None)),
+            Err(err) => Err(err),
         }
+    }
+}
+
+struct RedbUnitOfWork<'a> {
+    db: &'a Database,
+    txn: &'a redb::WriteTransaction,
+}
+
+impl app::UnitOfWork for RedbUnitOfWork<'_> {
+    fn sources(&self) -> &dyn app::SourceRepository {
+        self
+    }
+
+    fn snapshots(&self) -> &dyn app::SnapshotRepository {
+        self
+    }
+}
+
+impl app::SnapshotRepository for RedbUnitOfWork<'_> {
+    fn save(&self, snapshot: &Snapshot) -> Result<()> {
+        let source = source_to_u8(snapshot.source());
+        let unix = snapshot.captured_at().unix_timestamp();
+
+        let mut captures = self.txn.open_table(CAPTURES)?;
+        for post in snapshot.posts() {
+            let key = capture_key(source, unix, post.post_id().as_str());
+            let value = serde_json::to_vec(&PersistedPost::from(post))?;
+            captures.insert(key.as_slice(), value.as_slice())?;
+        }
+        Ok(())
+    }
+
+    fn in_range(&self, source: SourceId, from: DateTime, to: DateTime) -> Result<Vec<Snapshot>> {
+        self.db.read_in_range(source, from, to)
+    }
+}
+
+impl app::SourceRepository for RedbUnitOfWork<'_> {
+    fn get(&self, id: SourceId) -> Result<Source> {
+        self.db.read_source(id)
     }
 
     fn save(&self, source: &Source) -> Result<()> {
         let key = vec![source_to_u8(source.id())];
         let value = serde_json::to_vec(&PersistedSource::from(source))?;
 
-        let write_txn = self.db.begin_write()?;
-        {
-            let mut table = write_txn.open_table(SOURCES)?;
-            table.insert(key.as_slice(), value.as_slice())?;
-        }
-        write_txn.commit()?;
+        let mut table = self.txn.open_table(SOURCES)?;
+        table.insert(key.as_slice(), value.as_slice())?;
         Ok(())
     }
 }
@@ -328,7 +389,7 @@ impl app::SourceRepository for Database {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::SnapshotRepository;
+    use crate::app::{SnapshotRepository, SourceRepository, Transactor};
 
     fn tmp_db() -> Database {
         let dir = std::env::temp_dir();
@@ -367,9 +428,14 @@ mod tests {
     #[test]
     fn save_then_in_range_roundtrips() {
         let db = tmp_db();
-        db.save(&snapshot(ts(13), vec![post("a", 1, 2), post("b", 3, 4)]))
-            .unwrap();
-        db.save(&snapshot(ts(15), vec![post("c", 5, 6)])).unwrap();
+        db.execute(|uow| {
+            uow.snapshots()
+                .save(&snapshot(ts(13), vec![post("a", 1, 2), post("b", 3, 4)]))?;
+            uow.snapshots()
+                .save(&snapshot(ts(15), vec![post("c", 5, 6)]))?;
+            Ok(())
+        })
+        .unwrap();
 
         let all = db.in_range(SourceId::HackerNews, ts(0), ts(23)).unwrap();
         assert_eq!(all.len(), 2);
@@ -388,22 +454,19 @@ mod tests {
 
     #[test]
     fn source_defaults_then_persists() {
-        use crate::app::SourceRepository;
-
         let db = tmp_db();
         let initial = SourceRepository::get(&db, SourceId::HackerNews).unwrap();
         assert!(initial.last_snapshot().is_none());
         assert!(initial.last_attempt_at().is_none());
 
         let attempt = ts(15);
-        SourceRepository::save(
-            &db,
-            &Source::new(
+        db.execute(|uow| {
+            uow.sources().save(&Source::new(
                 SourceId::HackerNews,
                 Some(snapshot(ts(15), vec![post("c", 5, 6)])),
                 Some(attempt),
-            ),
-        )
+            ))
+        })
         .unwrap();
 
         let loaded = SourceRepository::get(&db, SourceId::HackerNews).unwrap();
@@ -418,5 +481,19 @@ mod tests {
                 .last_snapshot()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn execute_rolls_back_on_error() {
+        let db = tmp_db();
+        let result: Result<()> = db.execute(|uow| {
+            uow.snapshots()
+                .save(&snapshot(ts(13), vec![post("a", 1, 2)]))?;
+            Err(anyhow!("boom").into())
+        });
+        assert!(result.is_err());
+
+        let all = db.in_range(SourceId::HackerNews, ts(0), ts(23)).unwrap();
+        assert!(all.is_empty());
     }
 }

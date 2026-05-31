@@ -51,6 +51,17 @@ pub trait SnapshotRepository {
     fn in_range(&self, source: SourceId, from: DateTime, to: DateTime) -> Result<Vec<Snapshot>>;
 }
 
+pub trait UnitOfWork {
+    fn sources(&self) -> &dyn SourceRepository;
+    fn snapshots(&self) -> &dyn SnapshotRepository;
+}
+
+pub trait Transactor {
+    fn execute<F, T>(&self, work: F) -> Result<T>
+    where
+        F: FnOnce(&dyn UnitOfWork) -> Result<T>;
+}
+
 #[async_trait]
 pub trait SnapshotTaker: Send + Sync {
     fn sources(&self) -> Vec<SourceId>;

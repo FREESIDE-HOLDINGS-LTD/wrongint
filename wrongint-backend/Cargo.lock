@@ -2170,6 +2170,42 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
+name = "utoipa"
+version = "5.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bde15df68e80b16c7d16b9616e80770ad158988daa56a27dccd1e55558b0160"
+dependencies = [
+ "indexmap",
+ "serde",
+ "serde_json",
+ "utoipa-gen",
+]
+
+[[package]]
+name = "utoipa-gen"
+version = "5.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ba0b99ee52df3028635d93840c797102da61f8a7bb3cf751032455895b52ef8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn",
+]
+
+[[package]]
+name = "utoipa-redoc"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6427547f6db7ec006cbbef95f7565952a16f362e298b416d2d497d9706fef72d"
+dependencies = [
+ "axum",
+ "serde",
+ "serde_json",
+ "utoipa",
+]
+
+[[package]]
 name = "uuid"
 version = "1.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2707,6 +2743,8 @@ dependencies = [
  "toml",
  "tower",
  "tower-http",
+ "utoipa",
+ "utoipa-redoc",
 ]
 
 [[package]]

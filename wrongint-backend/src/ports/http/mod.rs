@@ -13,6 +13,20 @@ use prometheus::{Registry, TextEncoder};
 use serde::{Deserialize, Serialize};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
+use utoipa::{IntoParams, OpenApi, ToSchema};
+use utoipa_redoc::{Redoc, Servable};
+
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "wrongint",
+        description = "Measures how argumentative programming communities are.",
+        version = "0.1.0"
+    ),
+    paths(handle_index),
+    components(schemas(ApiIndexSeries, ApiIndexPoint, ApiErrorBody))
+)]
+struct ApiDoc;
 
 const DEFAULT_RANGE_DAYS: u64 = 7;
 
@@ -53,6 +67,8 @@ where
         let router = Router::new()
             .route("/api/index", get(handle_index::<H>))
             .route("/metrics", get(handle_metrics::<H>))
+            .route("/openapi.json", get(handle_openapi))
+            .merge(Redoc::with_url("/docs", ApiDoc::openapi()))
             .layer(TraceLayer::new_for_http())
             .layer(cors)
             .with_state(self.state.clone());
@@ -63,6 +79,16 @@ where
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/index",
+    params(IndexParams),
+    responses(
+        (status = 200, description = "Index series for a source", body = ApiIndexSeries),
+        (status = 400, description = "Invalid query parameters", body = ApiErrorBody),
+        (status = 500, description = "Internal server error", body = ApiErrorBody),
+    )
+)]
 async fn handle_index<H>(
     State(state): State<AppState<H>>,
     Query(params): Query<IndexParams>,
@@ -100,6 +126,10 @@ async fn handle_metrics<H>(
     Ok(encoder.encode_to_string(&families)?)
 }
 
+async fn handle_openapi() -> Json<utoipa::openapi::OpenApi> {
+    Json(ApiDoc::openapi())
+}
+
 fn parse_source(s: &str) -> Result<SourceId, ApiError> {
     match s {
         "hackernews" => Ok(SourceId::HackerNews),
@@ -113,14 +143,18 @@ fn parse_ts(s: &str) -> Result<DateTime, ApiError> {
         .map_err(|_| ApiError::BadRequest(format!("bad timestamp '{s}' (want ISO-8601)")))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 struct IndexParams {
+    /// Source identifier: `hackernews` or `lobsters`.
     source: String,
+    /// Inclusive lower bound (ISO-8601). Defaults to 7 days ago.
     from: Option<String>,
+    /// Inclusive upper bound (ISO-8601). Defaults to now.
     to: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 struct ApiIndexSeries {
     source: String,
     points: Vec<ApiIndexPoint>,
@@ -135,7 +169,7 @@ impl From<&IndexSeries> for ApiIndexSeries {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 struct ApiIndexPoint {
     captured_at: String,
     index: Option<f64>,
@@ -180,7 +214,7 @@ impl IntoResponse for ApiError {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 struct ApiErrorBody {
     error: String,
 }
