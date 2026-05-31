@@ -712,6 +712,12 @@ a.section-head-name:hover {
   .contender-emoji {
     font-size: 40px;
   }
+  /* Logo is nowrap + cqw on desktop (one shrinking line). On mobile let it wrap
+     onto several lines at a fixed readable size instead of going tiny. */
+  .logo {
+    white-space: normal;
+    font-size: 28px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
