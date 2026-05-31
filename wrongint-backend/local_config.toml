@@ -1,0 +1,7 @@
+http_address = "0.0.0.0:8080"
+database_path = "local_database.redb"
+sample_interval_secs = 60
+request_timeout_secs = 10
+request_retries = 2
+hn_front_page_len = 30
+user_agent = "wrongint/0.1 (+https://example.invalid)"
