@@ -3,8 +3,8 @@ use log::{debug, error};
 use std::time::Duration;
 use tokio::time::sleep;
 
-static TICK_EVERY: Duration = Duration::from_secs(60);
-static METRICS_TICK_EVERY: Duration = Duration::from_secs(15);
+static CAPTURE_SNAPSHOTS_EVERY: Duration = Duration::from_secs(60);
+static UPDATE_METRICS_EVERY: Duration = Duration::from_secs(60);
 
 pub struct CaptureSnapshotsTimer<H: CaptureSnapshotsHandler> {
     handler: H,
@@ -28,7 +28,7 @@ where
                     error!("error executing capture snapshots timer: {}", err);
                 }
             }
-            sleep(TICK_EVERY).await;
+            sleep(CAPTURE_SNAPSHOTS_EVERY).await;
         }
     }
 }
@@ -55,7 +55,7 @@ where
                     error!("error executing update metrics timer: {}", err);
                 }
             }
-            sleep(METRICS_TICK_EVERY).await;
+            sleep(UPDATE_METRICS_EVERY).await;
         }
     }
 }
