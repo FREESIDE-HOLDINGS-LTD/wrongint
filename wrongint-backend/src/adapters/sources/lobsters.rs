@@ -1,5 +1,5 @@
 use crate::app;
-use crate::domain::{NumberOfComments, Post, PostId, Score, SourceId, Title, Url};
+use crate::domain::{PostComments, Post, PostId, PostTitle, PostUrl, PostScore, SourceId};
 use crate::errors::Result;
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -34,10 +34,10 @@ impl LobstersItem {
         Some(Post::new(
             SourceId::Lobsters,
             PostId::new(self.short_id).ok()?,
-            Title::new(self.title),
-            Url::new(self.url),
-            NumberOfComments::new(self.comment_count),
-            Score::UpvotesAndDownvotes(self.score),
+            PostTitle::new(self.title),
+            PostUrl::new(self.url),
+            PostComments::new(self.comment_count),
+            PostScore::UpvotesAndDownvotes(self.score),
         ))
     }
 }
@@ -79,8 +79,8 @@ mod tests {
         let posts: Vec<Post> = items.into_iter().filter_map(|i| i.into_post()).collect();
         assert_eq!(posts.len(), 2);
         assert_eq!(posts[0].post_id().as_str(), "abc");
-        assert_eq!(posts[0].score(), Score::UpvotesAndDownvotes(12));
-        assert_eq!(posts[1].score(), Score::UpvotesAndDownvotes(-2));
+        assert_eq!(posts[0].score(), PostScore::UpvotesAndDownvotes(12));
+        assert_eq!(posts[1].score(), PostScore::UpvotesAndDownvotes(-2));
         assert_eq!(posts[1].comments().value(), 40);
     }
 }

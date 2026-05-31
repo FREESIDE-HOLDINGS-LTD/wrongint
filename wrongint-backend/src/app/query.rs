@@ -154,7 +154,7 @@ fn bucket_key(at: DateTime, res: Resolution) -> Result<DateTime> {
 mod tests {
     use super::*;
     use crate::app::Store;
-    use crate::domain::{NumberOfComments, PostId, Score, Snapshot, Title, Url};
+    use crate::domain::{PostComments, PostId, PostTitle, PostUrl, PostScore, Snapshot};
     use std::sync::Mutex;
 
     fn ts(h: i64) -> DateTime {
@@ -165,10 +165,10 @@ mod tests {
         Post::new(
             source,
             PostId::new(format!("{c}-{s}")).unwrap(),
-            Title::new("t"),
-            Url::new("u"),
-            NumberOfComments::new(c),
-            Score::Points(s),
+            PostTitle::new("t"),
+            PostUrl::new("u"),
+            PostComments::new(c),
+            PostScore::Points(s),
         )
     }
 

@@ -1,9 +1,30 @@
 pub mod time;
 
-use crate::domain::time::DateTime;
+use crate::domain::time::{DateTime, Duration};
 use crate::errors::Result;
 use anyhow::anyhow;
 use std::fmt;
+
+pub const SNAPSHOT_INTERVAL_SECONDS: u64 = 10 * 60;
+
+pub struct Snapshots {
+    last: Option<Snapshot>,
+}
+
+impl Snapshots {
+    pub fn new(last: Option<Snapshot>) -> Self {
+        Self { last }
+    }
+
+    pub fn should_capture_new_snapshot(&self, now: DateTime) -> bool {
+        match &self.last {
+            None => true,
+            Some(snapshot) => {
+                now - snapshot.captured_at() >= Duration::new_from_seconds(SNAPSHOT_INTERVAL_SECONDS)
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Snapshot {
@@ -37,30 +58,62 @@ impl Snapshot {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Index {
+    value: f64,
+}
+
+impl Index {
+    pub fn from_snapshot(snapshot: &Snapshot) -> Option<Index> {
+        let mut comments = 0i64;
+        let mut score = 0i64;
+        for post in &snapshot.posts {
+            comments += post.comments.value();
+            score += match post.score {
+                PostScore::Points(points) => points.value(),
+                PostScore::UpvotesAndDownvotes(votes) => votes.net(),
+            };
+        }
+        if score <= 0 {
+            return None;
+        }
+        Some(Index {
+            value: comments as f64 / score as f64,
+        })
+    }
+
+    pub fn value(&self) -> f64 {
+        self.value
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Post {
     source: SourceId,
     post_id: PostId,
-    title: Title,
-    url: Url,
-    comments: NumberOfComments,
-    score: Score,
+    title: PostTitle,
+    url: PostUrl,
+    posted_at: DateTime,
+    comments: PostComments,
+    score: PostScore,
 }
 
 impl Post {
     pub fn new(
         source: SourceId,
         post_id: PostId,
-        title: Title,
-        url: Url,
-        comments: NumberOfComments,
-        score: Score,
+        title: PostTitle,
+        url: PostUrl,
+        posted_at: DateTime,
+        comments: PostComments,
+        score: PostScore,
     ) -> Self {
         Self {
             source,
             post_id,
             title,
             url,
+            posted_at,
             comments,
             score,
         }
@@ -74,19 +127,23 @@ impl Post {
         &self.post_id
     }
 
-    pub fn title(&self) -> &Title {
+    pub fn title(&self) -> &PostTitle {
         &self.title
     }
 
-    pub fn url(&self) -> &Url {
+    pub fn url(&self) -> &PostUrl {
         &self.url
     }
 
-    pub fn comments(&self) -> NumberOfComments {
+    pub fn posted_at(&self) -> DateTime {
+        self.posted_at
+    }
+
+    pub fn comments(&self) -> PostComments {
         self.comments
     }
 
-    pub fn score(&self) -> Score {
+    pub fn score(&self) -> PostScore {
         self.score
     }
 }
@@ -133,13 +190,17 @@ impl fmt::Display for PostId {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Title {
+pub struct PostTitle {
     value: String,
 }
 
-impl Title {
-    pub fn new(s: impl Into<String>) -> Self {
-        Self { value: s.into() }
+impl PostTitle {
+    pub fn new(s: impl Into<String>) -> Result<Self> {
+        let value = s.into();
+        if value.is_empty() {
+            return Err(anyhow!("post title can't be empty").into());
+        }
+        Ok(Self { value })
     }
 
     pub fn as_str(&self) -> &str {
@@ -147,20 +208,24 @@ impl Title {
     }
 }
 
-impl fmt::Display for Title {
+impl fmt::Display for PostTitle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Url {
+pub struct PostUrl {
     value: String,
 }
 
-impl Url {
-    pub fn new(s: impl Into<String>) -> Self {
-        Self { value: s.into() }
+impl PostUrl {
+    pub fn new(s: impl Into<String>) -> Result<Self> {
+        let value = s.into();
+        if value.is_empty() {
+            return Err(anyhow!("post url can't be empty").into());
+        }
+        Ok(Self { value })
     }
 
     pub fn as_str(&self) -> &str {
@@ -168,20 +233,23 @@ impl Url {
     }
 }
 
-impl fmt::Display for Url {
+impl fmt::Display for PostUrl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct NumberOfComments {
+pub struct PostComments {
     value: i64,
 }
 
-impl NumberOfComments {
-    pub fn new(n: i64) -> Self {
-        Self { value: n }
+impl PostComments {
+    pub fn new(n: i64) -> Result<Self> {
+        if n < 0 {
+            return Err(anyhow!("post comments can't be negative").into());
+        }
+        Ok(Self { value: n })
     }
 
     pub fn value(&self) -> i64 {
@@ -190,107 +258,375 @@ impl NumberOfComments {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Score {
-    Points(i64),
-    UpvotesAndDownvotes(i64),
+pub enum PostScore {
+    Points(Points),
+    UpvotesAndDownvotes(UpvotesAndDownvotes),
 }
 
-impl Score {
-    pub fn value(&self) -> i64 {
-        match self {
-            Score::Points(v) => *v,
-            Score::UpvotesAndDownvotes(v) => *v,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Points {
+    value: i64,
+}
+
+impl Points {
+    pub fn new(value: i64) -> Result<Self> {
+        if value < 0 {
+            return Err(anyhow!("points can't be negative").into());
         }
+        Ok(Self { value })
+    }
+
+    pub fn value(&self) -> i64 {
+        self.value
     }
 }
 
-pub fn wrongint_score(comments: i64, score: i64) -> Option<f64> {
-    if score <= 0 {
-        return None;
-    }
-    Some(comments as f64 / score as f64)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct UpvotesAndDownvotes {
+    upvotes: i64,
+    downvotes: i64,
 }
 
-pub fn totals(posts: &[Post]) -> (i64, i64) {
-    posts.iter().fold((0i64, 0i64), |(c, s), p| {
-        (c + p.comments.value(), s + p.score.value())
-    })
+impl UpvotesAndDownvotes {
+    pub fn new(upvotes: i64, downvotes: i64) -> Result<Self> {
+        if upvotes < 0 {
+            return Err(anyhow!("upvotes can't be negative").into());
+        }
+        if downvotes < 0 {
+            return Err(anyhow!("downvotes can't be negative").into());
+        }
+        Ok(Self { upvotes, downvotes })
+    }
+
+    pub fn upvotes(&self) -> i64 {
+        self.upvotes
+    }
+
+    pub fn downvotes(&self) -> i64 {
+        self.downvotes
+    }
+
+    pub fn net(&self) -> i64 {
+        self.upvotes - self.downvotes
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn score_basic() {
-        assert_eq!(wrongint_score(10, 5), Some(2.0));
-        assert_eq!(wrongint_score(0, 5), Some(0.0));
-    }
-
-    #[test]
-    fn score_guards_nonpositive_denominator() {
-        assert_eq!(wrongint_score(10, 0), None);
-        assert_eq!(wrongint_score(10, -3), None);
-    }
-
-    #[test]
-    fn source_id_display() {
-        assert_eq!(SourceId::HackerNews.to_string(), "hackernews");
-        assert_eq!(SourceId::Lobsters.to_string(), "lobsters");
-    }
-
-    fn make_post(c: i64, s: Score) -> Post {
-        Post::new(
+    fn make_post(c: i64, s: PostScore) -> Result<Post> {
+        Ok(Post::new(
             SourceId::HackerNews,
-            PostId::new("x").unwrap(),
-            Title::new("t"),
-            Url::new("u"),
-            NumberOfComments::new(c),
-            s,
-        )
-    }
-
-    #[test]
-    fn totals_sums() {
-        let posts = vec![
-            make_post(3, Score::Points(4)),
-            make_post(7, Score::Points(6)),
-        ];
-        assert_eq!(totals(&posts), (10, 10));
-    }
-
-    #[test]
-    fn snapshot_rejects_empty() {
-        assert!(Snapshot::new(SourceId::HackerNews, DateTime::now(), vec![]).is_err());
-    }
-
-    #[test]
-    fn snapshot_holds_posts() {
-        let snap = Snapshot::new(
-            SourceId::Lobsters,
+            PostId::new("x")?,
+            PostTitle::new("t")?,
+            PostUrl::new("u")?,
             DateTime::now(),
-            vec![make_post(1, Score::Points(2))],
-        )
-        .unwrap();
-        assert_eq!(snap.posts().len(), 1);
-        assert_eq!(snap.source(), SourceId::Lobsters);
+            PostComments::new(c)?,
+            s,
+        ))
     }
 
-    #[test]
-    fn post_id_rejects_empty() {
-        assert!(PostId::new("").is_err());
-        assert_eq!(PostId::new("7").unwrap().as_str(), "7");
+    mod snapshots {
+        use super::super::*;
+
+        fn at(unix: i64) -> Result<DateTime> {
+            DateTime::new_from_unix_timestamp(unix)
+        }
+
+        fn snapshot_at(now: DateTime) -> Result<Snapshot> {
+            Snapshot::new(
+                SourceId::HackerNews,
+                now,
+                vec![super::make_post(1, PostScore::Points(Points::new(2)?))?],
+            )
+        }
+
+        #[test]
+        fn captures_when_no_previous_snapshot() {
+            let snapshots = Snapshots::new(None);
+            assert!(snapshots.should_capture_new_snapshot(DateTime::now()));
+        }
+
+        #[test]
+        fn skips_when_within_interval() -> Result<()> {
+            let snapshots = Snapshots::new(Some(snapshot_at(at(1_780_000_000)?)?));
+            assert!(!snapshots.should_capture_new_snapshot(at(1_780_000_300)?));
+            Ok(())
+        }
+
+        #[test]
+        fn captures_when_interval_elapsed() -> Result<()> {
+            let snapshots = Snapshots::new(Some(snapshot_at(at(1_780_000_000)?)?));
+            assert!(snapshots.should_capture_new_snapshot(at(1_780_000_600)?));
+            Ok(())
+        }
     }
 
-    #[test]
-    fn score_value_ignores_variant() {
-        assert_eq!(Score::Points(5).value(), 5);
-        assert_eq!(Score::UpvotesAndDownvotes(-3).value(), -3);
+    mod snapshot {
+        use super::super::*;
+
+        #[test]
+        fn rejects_empty() {
+            assert!(Snapshot::new(SourceId::HackerNews, DateTime::now(), vec![]).is_err());
+        }
+
+        #[test]
+        fn holds_posts() -> Result<()> {
+            let at = DateTime::now();
+            let snap = Snapshot::new(
+                SourceId::Lobsters,
+                at,
+                vec![super::make_post(1, PostScore::Points(Points::new(2)?))?],
+            )?;
+            assert_eq!(snap.posts().len(), 1);
+            assert_eq!(snap.source(), SourceId::Lobsters);
+            assert_eq!(snap.captured_at(), at);
+            Ok(())
+        }
     }
 
-    #[test]
-    fn unix_timestamp_roundtrips() {
-        let t = DateTime::new_from_unix_timestamp(1_780_000_000).unwrap();
-        assert_eq!(t.unix_timestamp(), 1_780_000_000);
+    mod index {
+        use super::super::*;
+
+        #[test]
+        fn none_when_score_nonpositive() -> Result<()> {
+            let snap = Snapshot::new(
+                SourceId::HackerNews,
+                DateTime::now(),
+                vec![super::make_post(10, PostScore::Points(Points::new(0)?))?],
+            )?;
+            assert_eq!(Index::from_snapshot(&snap), None);
+            Ok(())
+        }
+
+        #[test]
+        fn ratio_of_comments_over_score() -> Result<()> {
+            let snap = Snapshot::new(
+                SourceId::HackerNews,
+                DateTime::now(),
+                vec![
+                    super::make_post(4, PostScore::Points(Points::new(2)?))?,
+                    super::make_post(
+                        6,
+                        PostScore::UpvotesAndDownvotes(UpvotesAndDownvotes::new(4, 1)?),
+                    )?,
+                ],
+            )?;
+            assert_eq!(Index::from_snapshot(&snap).map(|i| i.value()), Some(2.0));
+            Ok(())
+        }
+    }
+
+    mod post {
+        use super::super::*;
+
+        #[test]
+        fn exposes_fields() -> Result<()> {
+            let posted = DateTime::new_from_unix_timestamp(1_780_000_000)?;
+            let post = Post::new(
+                SourceId::Lobsters,
+                PostId::new("abc")?,
+                PostTitle::new("title")?,
+                PostUrl::new("https://e.com/a")?,
+                posted,
+                PostComments::new(9)?,
+                PostScore::UpvotesAndDownvotes(UpvotesAndDownvotes::new(12, 2)?),
+            );
+            assert_eq!(post.source(), SourceId::Lobsters);
+            assert_eq!(post.post_id().as_str(), "abc");
+            assert_eq!(post.title().as_str(), "title");
+            assert_eq!(post.url().as_str(), "https://e.com/a");
+            assert_eq!(post.posted_at(), posted);
+            assert_eq!(post.comments().value(), 9);
+            assert_eq!(
+                post.score(),
+                PostScore::UpvotesAndDownvotes(UpvotesAndDownvotes::new(12, 2)?)
+            );
+            Ok(())
+        }
+
+        #[test]
+        fn builds_real_hackernews_post() -> Result<()> {
+            let post = Post::new(
+                SourceId::HackerNews,
+                PostId::new("38901234")?,
+                PostTitle::new("Show HN: A redb-backed time series for forum sentiment")?,
+                PostUrl::new("https://news.ycombinator.com/item?id=38901234")?,
+                DateTime::new_from_rfc3339("2024-01-02T15:04:05Z")?,
+                PostComments::new(128)?,
+                PostScore::Points(Points::new(342)?),
+            );
+            assert_eq!(post.source(), SourceId::HackerNews);
+            assert_eq!(post.post_id().as_str(), "38901234");
+            assert_eq!(
+                post.url().as_str(),
+                "https://news.ycombinator.com/item?id=38901234"
+            );
+            assert_eq!(post.score(), PostScore::Points(Points::new(342)?));
+            Ok(())
+        }
+
+        #[test]
+        fn builds_real_lobsters_post() -> Result<()> {
+            let post = Post::new(
+                SourceId::Lobsters,
+                PostId::new("xq8dao")?,
+                PostTitle::new("Hexagonal architecture in Rust, revisited")?,
+                PostUrl::new("https://lobste.rs/s/xq8dao")?,
+                DateTime::new_from_rfc3339("2024-01-02T09:30:00Z")?,
+                PostComments::new(37)?,
+                PostScore::UpvotesAndDownvotes(UpvotesAndDownvotes::new(54, 6)?),
+            );
+            assert_eq!(post.source(), SourceId::Lobsters);
+            assert_eq!(post.post_id().as_str(), "xq8dao");
+            assert_eq!(post.url().as_str(), "https://lobste.rs/s/xq8dao");
+            match post.score() {
+                PostScore::UpvotesAndDownvotes(v) => assert_eq!(v.net(), 48),
+                _ => panic!("wrong variant"),
+            }
+            Ok(())
+        }
+    }
+
+    mod source_id {
+        use super::super::*;
+
+        #[test]
+        fn displays_as_slug() {
+            assert_eq!(SourceId::HackerNews.to_string(), "hackernews");
+            assert_eq!(SourceId::Lobsters.to_string(), "lobsters");
+        }
+    }
+
+    mod post_id {
+        use super::super::*;
+
+        #[test]
+        fn rejects_empty() {
+            assert!(PostId::new("").is_err());
+        }
+
+        #[test]
+        fn exposes_value() -> Result<()> {
+            let id = PostId::new("7")?;
+            assert_eq!(id.as_str(), "7");
+            assert_eq!(id.to_string(), "7");
+            Ok(())
+        }
+    }
+
+    mod post_title {
+        use super::super::*;
+
+        #[test]
+        fn rejects_empty() {
+            assert!(PostTitle::new("").is_err());
+        }
+
+        #[test]
+        fn exposes_value() -> Result<()> {
+            let title = PostTitle::new("hello")?;
+            assert_eq!(title.as_str(), "hello");
+            assert_eq!(title.to_string(), "hello");
+            Ok(())
+        }
+    }
+
+    mod post_url {
+        use super::super::*;
+
+        #[test]
+        fn rejects_empty() {
+            assert!(PostUrl::new("").is_err());
+        }
+
+        #[test]
+        fn exposes_value() -> Result<()> {
+            let url = PostUrl::new("https://e.com")?;
+            assert_eq!(url.as_str(), "https://e.com");
+            assert_eq!(url.to_string(), "https://e.com");
+            Ok(())
+        }
+    }
+
+    mod post_comments {
+        use super::super::*;
+
+        #[test]
+        fn rejects_negative() {
+            assert!(PostComments::new(-1).is_err());
+        }
+
+        #[test]
+        fn accepts_zero_and_positive() -> Result<()> {
+            assert_eq!(PostComments::new(0)?.value(), 0);
+            assert_eq!(PostComments::new(42)?.value(), 42);
+            Ok(())
+        }
+    }
+
+    mod post_score {
+        use super::super::*;
+
+        #[test]
+        fn carries_points() -> Result<()> {
+            assert_eq!(
+                PostScore::Points(Points::new(5)?),
+                PostScore::Points(Points::new(5)?)
+            );
+            Ok(())
+        }
+
+        #[test]
+        fn carries_votes() -> Result<()> {
+            let s = PostScore::UpvotesAndDownvotes(UpvotesAndDownvotes::new(8, 6)?);
+            match s {
+                PostScore::UpvotesAndDownvotes(v) => assert_eq!(v.net(), 2),
+                _ => panic!("wrong variant"),
+            }
+            Ok(())
+        }
+    }
+
+    mod points {
+        use super::super::*;
+
+        #[test]
+        fn rejects_negative() {
+            assert!(Points::new(-1).is_err());
+        }
+
+        #[test]
+        fn carries_value() -> Result<()> {
+            assert_eq!(Points::new(0)?.value(), 0);
+            assert_eq!(Points::new(7)?.value(), 7);
+            Ok(())
+        }
+    }
+
+    mod upvotes_and_downvotes {
+        use super::super::*;
+
+        #[test]
+        fn rejects_negative_counts() {
+            assert!(UpvotesAndDownvotes::new(-1, 0).is_err());
+            assert!(UpvotesAndDownvotes::new(0, -1).is_err());
+        }
+
+        #[test]
+        fn exposes_counts() -> Result<()> {
+            let v = UpvotesAndDownvotes::new(10, 3)?;
+            assert_eq!(v.upvotes(), 10);
+            assert_eq!(v.downvotes(), 3);
+            Ok(())
+        }
+
+        #[test]
+        fn net_is_upvotes_minus_downvotes() -> Result<()> {
+            assert_eq!(UpvotesAndDownvotes::new(10, 3)?.net(), 7);
+            assert_eq!(UpvotesAndDownvotes::new(2, 5)?.net(), -3);
+            Ok(())
+        }
     }
 }

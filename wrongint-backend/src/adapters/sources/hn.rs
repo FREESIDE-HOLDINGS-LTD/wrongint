@@ -1,5 +1,8 @@
 use crate::app;
-use crate::domain::{NumberOfComments, Post, PostId, Score, SourceId, Title, Url};
+use crate::domain::time::DateTime;
+use crate::domain::{
+    Points, Post, PostComments, PostId, PostScore, PostTitle, PostUrl, SourceId,
+};
 use crate::errors::Result;
 use async_trait::async_trait;
 use futures::stream::StreamExt;
@@ -43,6 +46,8 @@ struct HnItem {
     title: String,
     url: Option<String>,
     #[serde(default)]
+    time: i64,
+    #[serde(default)]
     dead: bool,
     #[serde(default)]
     deleted: bool,
@@ -60,10 +65,11 @@ impl HnItem {
         Some(Post::new(
             SourceId::HackerNews,
             PostId::new(self.id.to_string()).ok()?,
-            Title::new(self.title),
-            Url::new(url),
-            NumberOfComments::new(self.descendants),
-            Score::Points(self.score),
+            PostTitle::new(self.title).ok()?,
+            PostUrl::new(url).ok()?,
+            DateTime::new_from_unix_timestamp(self.time).ok()?,
+            PostComments::new(self.descendants).ok()?,
+            PostScore::Points(Points::new(self.score)),
         ))
     }
 }
@@ -121,7 +127,7 @@ mod tests {
         let item: HnItem = serde_json::from_str(json).unwrap();
         let post = item.into_post().unwrap();
         assert_eq!(post.post_id().as_str(), "1");
-        assert_eq!(post.score(), Score::Points(100));
+        assert_eq!(post.score(), PostScore::Points(100));
         assert_eq!(post.comments().value(), 42);
         assert_eq!(post.url().as_str(), "https://example.com");
     }

@@ -1,6 +1,9 @@
 use crate::app;
 use crate::domain::time::DateTime;
-use crate::domain::{NumberOfComments, Post, PostId, Score, Snapshot, SourceId, Title, Url};
+use crate::domain::{
+    Points, Post, PostComments, PostId, PostScore, PostTitle, PostUrl, Snapshot, SourceId,
+    UpvotesAndDownvotes,
+};
 use crate::errors::Result;
 use anyhow::{Context, anyhow};
 use redb::{ReadableDatabase, TableDefinition};
@@ -80,23 +83,28 @@ struct MetaValue {
 #[derive(Serialize, Deserialize)]
 enum PersistedScore {
     Points(i64),
-    UpvotesAndDownvotes(i64),
+    UpvotesAndDownvotes { upvotes: i64, downvotes: i64 },
 }
 
-impl From<Score> for PersistedScore {
-    fn from(s: Score) -> Self {
+impl From<PostScore> for PersistedScore {
+    fn from(s: PostScore) -> Self {
         match s {
-            Score::Points(v) => PersistedScore::Points(v),
-            Score::UpvotesAndDownvotes(v) => PersistedScore::UpvotesAndDownvotes(v),
+            PostScore::Points(p) => PersistedScore::Points(p.value()),
+            PostScore::UpvotesAndDownvotes(v) => PersistedScore::UpvotesAndDownvotes {
+                upvotes: v.upvotes(),
+                downvotes: v.downvotes(),
+            },
         }
     }
 }
 
-impl From<PersistedScore> for Score {
+impl From<PersistedScore> for PostScore {
     fn from(s: PersistedScore) -> Self {
         match s {
-            PersistedScore::Points(v) => Score::Points(v),
-            PersistedScore::UpvotesAndDownvotes(v) => Score::UpvotesAndDownvotes(v),
+            PersistedScore::Points(v) => PostScore::Points(Points::new(v)),
+            PersistedScore::UpvotesAndDownvotes { upvotes, downvotes } => {
+                PostScore::UpvotesAndDownvotes(UpvotesAndDownvotes::new(upvotes, downvotes))
+            }
         }
     }
 }
@@ -107,6 +115,7 @@ struct PersistedPost {
     post_id: String,
     title: String,
     url: String,
+    posted_at: i64,
     comments: i64,
     score: PersistedScore,
 }
@@ -118,6 +127,7 @@ impl From<&Post> for PersistedPost {
             post_id: p.post_id().as_str().to_string(),
             title: p.title().as_str().to_string(),
             url: p.url().as_str().to_string(),
+            posted_at: p.posted_at().unix_timestamp(),
             comments: p.comments().value(),
             score: p.score().into(),
         }
@@ -131,9 +141,10 @@ impl TryFrom<PersistedPost> for Post {
         Ok(Post::new(
             source_from_u8(p.source)?,
             PostId::new(p.post_id)?,
-            Title::new(p.title),
-            Url::new(p.url),
-            NumberOfComments::new(p.comments),
+            PostTitle::new(p.title)?,
+            PostUrl::new(p.url)?,
+            DateTime::new_from_unix_timestamp(p.posted_at)?,
+            PostComments::new(p.comments)?,
             p.score.into(),
         ))
     }
@@ -221,7 +232,7 @@ impl app::Store for Database {
 mod tests {
     use super::*;
     use crate::app::Store;
-    use crate::domain::{NumberOfComments, PostId, Score, SourceId, Title, Url};
+    use crate::domain::{Points, PostComments, PostId, PostScore, PostTitle, PostUrl, SourceId};
 
     fn tmp_db() -> Database {
         let dir = std::env::temp_dir();
@@ -245,10 +256,11 @@ mod tests {
         Post::new(
             SourceId::HackerNews,
             PostId::new(id).unwrap(),
-            Title::new("t"),
-            Url::new("u"),
-            NumberOfComments::new(c),
-            Score::Points(s),
+            PostTitle::new("t").unwrap(),
+            PostUrl::new("u").unwrap(),
+            ts(0),
+            PostComments::new(c).unwrap(),
+            PostScore::Points(Points::new(s)),
         )
     }
 
