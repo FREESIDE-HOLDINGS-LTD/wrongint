@@ -198,8 +198,12 @@ body {
 .card-title {
   font-size: 13px;
   line-height: 1.3;
-  max-height: 2.6em;
+  height: 2.6em;
   overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .card-meta {
