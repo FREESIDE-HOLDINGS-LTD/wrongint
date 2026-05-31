@@ -281,6 +281,15 @@ pub enum PostScore {
     UpvotesAndDownvotes(UpvotesAndDownvotes),
 }
 
+impl PostScore {
+    pub fn net(&self) -> i64 {
+        match self {
+            PostScore::Points(points) => points.value(),
+            PostScore::UpvotesAndDownvotes(votes) => votes.net(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Points {
     value: i64,

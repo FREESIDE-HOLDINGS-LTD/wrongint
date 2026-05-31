@@ -6,6 +6,7 @@ use wrongint_backend::adapters::{ConfigLoader, Metrics, redb};
 use wrongint_backend::app::CaptureSnapshotsHandler as _;
 use wrongint_backend::app::capture_snapshots::CaptureSnapshotsHandler;
 use wrongint_backend::app::get_index_series::GetIndexSeriesHandler;
+use wrongint_backend::app::get_snapshot::GetSnapshotHandler;
 use wrongint_backend::app::update_metrics::UpdateMetricsHandler;
 use wrongint_backend::config::Config;
 use wrongint_backend::errors::Result;
@@ -60,9 +61,10 @@ async fn run(config_path: &str, sample_now: bool) -> Result<()> {
     Ok(())
 }
 
-async fn http_server_loop<H>(server: &http::Server<'_, H>)
+async fn http_server_loop<H, S>(server: &http::Server<'_, H, S>)
 where
     H: wrongint_backend::app::GetIndexSeriesHandler + Clone + Send + Sync + 'static,
+    S: wrongint_backend::app::GetSnapshotHandler + Clone + Send + Sync + 'static,
 {
     loop {
         match server.run().await {
@@ -74,10 +76,11 @@ where
 
 type CaptureHandlerImpl = CaptureSnapshotsHandler<redb::Database, redb::Database, Sources, Metrics>;
 type GetIndexSeriesHandlerImpl = GetIndexSeriesHandler<redb::Database, Metrics>;
+type GetSnapshotHandlerImpl = GetSnapshotHandler<redb::Database, Metrics>;
 type UpdateMetricsHandlerImpl = UpdateMetricsHandler<redb::Database, Metrics>;
 type CaptureTimerImpl = CaptureSnapshotsTimer<CaptureHandlerImpl>;
 type UpdateMetricsTimerImpl = UpdateMetricsTimer<UpdateMetricsHandlerImpl>;
-type HttpServerImpl<'a> = http::Server<'a, GetIndexSeriesHandlerImpl>;
+type HttpServerImpl<'a> = http::Server<'a, GetIndexSeriesHandlerImpl, GetSnapshotHandlerImpl>;
 
 struct Service<'a> {
     http_server: HttpServerImpl<'a>,
@@ -107,11 +110,12 @@ impl<'a> Service<'a> {
         );
         let get_index_series_handler =
             GetIndexSeriesHandler::new(database.clone(), metrics.clone());
+        let get_snapshot_handler = GetSnapshotHandler::new(database.clone(), metrics.clone());
         let update_metrics_handler = UpdateMetricsHandler::new(database.clone(), metrics.clone());
 
         let capture_timer = CaptureSnapshotsTimer::new(capture_handler.clone());
         let update_metrics_timer = UpdateMetricsTimer::new(update_metrics_handler);
-        let state = AppState::new(get_index_series_handler, registry);
+        let state = AppState::new(get_index_series_handler, get_snapshot_handler, registry);
         let http_server = http::Server::new(config, state);
 
         Ok(Self {

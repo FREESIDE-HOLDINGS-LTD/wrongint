@@ -1,5 +1,6 @@
 pub mod capture_snapshots;
 pub mod get_index_series;
+pub mod get_snapshot;
 pub mod update_metrics;
 
 use crate::domain::time::{DateTime, Duration};
@@ -20,6 +21,11 @@ pub trait GetIndexSeriesHandler: Send + Sync {
 #[async_trait]
 pub trait UpdateMetricsHandler {
     async fn handle(&self) -> Result<()>;
+}
+
+#[async_trait]
+pub trait GetSnapshotHandler: Send + Sync {
+    async fn handle(&self, source: SourceId) -> Result<Option<Snapshot>>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -137,10 +143,13 @@ macro_rules! record_application_handler_call {
     ($metrics:expr, $handler_name:expr, $expr:expr) => {{
         let start = $crate::domain::time::DateTime::now();
         let result = $expr;
-        $metrics.record_application_handler_call(
+        let duration = $crate::domain::time::DateTime::now() - start;
+        $metrics.record_application_handler_call($handler_name, (&result).into(), duration);
+        log::debug!(
+            "application handler {} {} in {}ms",
             $handler_name,
-            (&result).into(),
-            $crate::domain::time::DateTime::now() - start,
+            if result.is_ok() { "ok" } else { "error" },
+            duration.to_std().as_millis()
         );
         result
     }};
