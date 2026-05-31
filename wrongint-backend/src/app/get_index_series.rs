@@ -1,6 +1,6 @@
 use crate::app;
 use crate::app::{GetIndexSeries, IndexCandles, IndexScope, Metrics, SnapshotRepository};
-use crate::domain::{IndexOverTime, Snapshot, SourceId};
+use crate::domain::{IndexOverTime, SourceId};
 use crate::errors::Result;
 use crate::record_application_handler_call;
 use async_trait::async_trait;
@@ -24,21 +24,21 @@ where
     }
 
     async fn handle_inner(&self, v: &GetIndexSeries) -> Result<IndexCandles> {
-        let mut snapshots: Vec<Snapshot> = Vec::new();
-        match v.scope() {
+        let over_time = match v.scope() {
             IndexScope::Source(id) => {
-                snapshots.extend(self.repository.in_range(id, v.from(), v.to())?);
+                let snapshots = self.repository.in_range(id, v.from(), v.to())?;
+                IndexOverTime::from_snapshots(v.from(), v.to(), snapshots)?
             }
             IndexScope::Global => {
+                let mut sources: Vec<IndexOverTime> = Vec::new();
                 for id in SourceId::all() {
-                    snapshots.extend(self.repository.in_range(id, v.from(), v.to())?);
+                    let snapshots = self.repository.in_range(id, v.from(), v.to())?;
+                    sources.push(IndexOverTime::from_snapshots(v.from(), v.to(), snapshots)?);
                 }
+                IndexOverTime::from_sources(sources)
             }
-        }
-        Ok(IndexCandles::new(
-            v.scope(),
-            IndexOverTime::from_snapshots(v.from(), v.to(), snapshots)?,
-        ))
+        };
+        Ok(IndexCandles::new(v.scope(), over_time))
     }
 }
 

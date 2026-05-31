@@ -1,5 +1,5 @@
 use crate::app;
-use crate::app::{GetIndexSeries, IndexCandles, IndexScope};
+use crate::app::{GetIndexSeries, IndexScope};
 use crate::config::Config;
 use crate::domain::time::{DateTime, Duration};
 use crate::domain::{Index, IndexCandle, Post, Snapshot, SourceId};
@@ -267,24 +267,15 @@ struct IndexRange {
 }
 
 #[derive(Serialize, ToSchema)]
-struct ApiIndexCandles {
-    #[schema(example = "all")]
-    source: String,
+struct ApiGlobalIndex {
     candles: Vec<ApiIndexCandle>,
 }
 
-impl From<&IndexCandles> for ApiIndexCandles {
-    fn from(s: &IndexCandles) -> Self {
-        Self {
-            source: s.scope().to_string(),
-            candles: s
-                .over_time()
-                .candles()
-                .iter()
-                .map(ApiIndexCandle::from)
-                .collect(),
-        }
-    }
+#[derive(Serialize, ToSchema)]
+struct ApiSourceIndex {
+    #[schema(example = "hackernews")]
+    source: String,
+    candles: Vec<ApiIndexCandle>,
 }
 
 #[derive(Serialize, ToSchema)]
