@@ -1,9 +1,63 @@
 use crate::domain::time::{Date, DateTime, Duration};
-use crate::domain::{Post, PostScore, Snapshot};
+use crate::domain::{Post, Snapshot, SourceId};
 use crate::errors::Result;
 use std::collections::BTreeMap;
 
 const HOUR_SECONDS: u64 = 3600;
+
+#[derive(Debug, Clone)]
+pub struct GlobalIndex {
+    over_time: IndexOverTime,
+}
+
+impl GlobalIndex {
+    pub fn from_sources(sources: Vec<SourceIndex>) -> GlobalIndex {
+        let over_times: Vec<IndexOverTime> = sources.into_iter().map(|s| s.over_time).collect();
+        GlobalIndex {
+            over_time: IndexOverTime::from_sources(over_times),
+        }
+    }
+
+    pub fn over_time(&self) -> &IndexOverTime {
+        &self.over_time
+    }
+
+    pub fn latest(&self) -> Option<SnapshotIndex> {
+        self.over_time.latest()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SourceIndex {
+    source_id: SourceId,
+    over_time: IndexOverTime,
+}
+
+impl SourceIndex {
+    pub fn from_snapshots(
+        source_id: SourceId,
+        from: DateTime,
+        to: DateTime,
+        snapshots: Vec<Snapshot>,
+    ) -> Result<SourceIndex> {
+        Ok(SourceIndex {
+            source_id,
+            over_time: IndexOverTime::from_snapshots(from, to, snapshots)?,
+        })
+    }
+
+    pub fn source_id(&self) -> SourceId {
+        self.source_id
+    }
+
+    pub fn over_time(&self) -> &IndexOverTime {
+        &self.over_time
+    }
+
+    pub fn latest(&self) -> Option<SnapshotIndex> {
+        self.over_time.latest()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct IndexOverTime {
@@ -45,13 +99,21 @@ impl IndexOverTime {
         &self.candles
     }
 
-    fn samples_by_hour(snapshots: &[Snapshot]) -> Result<BTreeMap<i64, Vec<Index>>> {
+    pub fn latest(&self) -> Option<SnapshotIndex> {
+        self.candles
+            .iter()
+            .rev()
+            .find_map(|c| c.ohlc)
+            .map(|o| o.close())
+    }
+
+    fn samples_by_hour(snapshots: &[Snapshot]) -> Result<BTreeMap<i64, Vec<SnapshotIndex>>> {
         let mut sorted: Vec<&Snapshot> = snapshots.iter().collect();
         sorted.sort_by_key(|s| s.captured_at().unix_timestamp());
 
-        let mut samples_by_hour: BTreeMap<i64, Vec<Index>> = BTreeMap::new();
+        let mut samples_by_hour: BTreeMap<i64, Vec<SnapshotIndex>> = BTreeMap::new();
         for snapshot in sorted {
-            if let Some(index) = Index::from_snapshot(snapshot) {
+            if let Some(index) = SnapshotIndex::from_snapshot(snapshot) {
                 let hour = snapshot.captured_at().truncate_to_hour()?.unix_timestamp();
                 samples_by_hour.entry(hour).or_default().push(index);
             }
@@ -59,7 +121,7 @@ impl IndexOverTime {
         Ok(samples_by_hour)
     }
 
-    fn ohlc_by_hour(samples_by_hour: &BTreeMap<i64, Vec<Index>>) -> BTreeMap<i64, Ohlc> {
+    fn ohlc_by_hour(samples_by_hour: &BTreeMap<i64, Vec<SnapshotIndex>>) -> BTreeMap<i64, Ohlc> {
         samples_by_hour
             .iter()
             .filter_map(|(hour, samples)| Ohlc::from_samples(samples).map(|ohlc| (*hour, ohlc)))
@@ -112,14 +174,14 @@ impl IndexCandle {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Ohlc {
-    open: Index,
-    high: Index,
-    low: Index,
-    close: Index,
+    open: SnapshotIndex,
+    high: SnapshotIndex,
+    low: SnapshotIndex,
+    close: SnapshotIndex,
 }
 
 impl Ohlc {
-    pub fn from_samples(samples: &[Index]) -> Option<Ohlc> {
+    fn from_samples(samples: &[SnapshotIndex]) -> Option<Ohlc> {
         let open = *samples.first()?;
         let close = *samples.last()?;
         let high = *samples
@@ -136,63 +198,58 @@ impl Ohlc {
         })
     }
 
-    pub fn mean(candles: &[Ohlc]) -> Option<Ohlc> {
+    fn mean(candles: &[Ohlc]) -> Option<Ohlc> {
         Some(Ohlc {
-            open: Index::mean(candles.iter().map(|c| &c.open))?,
-            high: Index::mean(candles.iter().map(|c| &c.high))?,
-            low: Index::mean(candles.iter().map(|c| &c.low))?,
-            close: Index::mean(candles.iter().map(|c| &c.close))?,
+            open: SnapshotIndex::mean(candles.iter().map(|c| &c.open))?,
+            high: SnapshotIndex::mean(candles.iter().map(|c| &c.high))?,
+            low: SnapshotIndex::mean(candles.iter().map(|c| &c.low))?,
+            close: SnapshotIndex::mean(candles.iter().map(|c| &c.close))?,
         })
     }
 
-    pub fn open(&self) -> Index {
+    pub fn open(&self) -> SnapshotIndex {
         self.open
     }
 
-    pub fn high(&self) -> Index {
+    pub fn high(&self) -> SnapshotIndex {
         self.high
     }
 
-    pub fn low(&self) -> Index {
+    pub fn low(&self) -> SnapshotIndex {
         self.low
     }
 
-    pub fn close(&self) -> Index {
+    pub fn close(&self) -> SnapshotIndex {
         self.close
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Index {
+pub struct SnapshotIndex {
     value: f64,
 }
 
-impl Index {
-    pub fn from_snapshot(snapshot: &Snapshot) -> Option<Index> {
-        Self::from_posts(snapshot.posts())
+impl SnapshotIndex {
+    pub fn from_snapshot(snapshot: &Snapshot) -> Option<SnapshotIndex> {
+        let indexes: Vec<PostIndex> = snapshot
+            .posts()
+            .iter()
+            .filter_map(PostIndex::from_post)
+            .collect();
+        Self::from_post_indexes(&indexes)
     }
 
-    pub fn from_posts<'a>(posts: impl IntoIterator<Item = &'a Post>) -> Option<Index> {
-        let mut comments = 0i64;
-        let mut score = 0i64;
-        let mut any = false;
-        for post in posts {
-            any = true;
-            comments += post.comments().value();
-            score += match post.score() {
-                PostScore::Points(points) => points.value(),
-                PostScore::UpvotesAndDownvotes(votes) => votes.net(),
-            };
-        }
-        if !any || score <= 0 {
+    fn from_post_indexes(indexes: &[PostIndex]) -> Option<SnapshotIndex> {
+        if indexes.is_empty() {
             return None;
         }
-        Some(Index {
-            value: comments as f64 / score as f64,
+        let sum: f64 = indexes.iter().map(|i| i.value()).sum();
+        Some(SnapshotIndex {
+            value: sum / indexes.len() as f64,
         })
     }
 
-    pub fn mean<'a>(indexes: impl IntoIterator<Item = &'a Index>) -> Option<Index> {
+    fn mean<'a>(indexes: impl IntoIterator<Item = &'a SnapshotIndex>) -> Option<SnapshotIndex> {
         let mut sum = 0.0;
         let mut count = 0u32;
         for index in indexes {
@@ -202,8 +259,29 @@ impl Index {
         if count == 0 {
             return None;
         }
-        Some(Index {
+        Some(SnapshotIndex {
             value: sum / count as f64,
+        })
+    }
+
+    pub fn value(&self) -> f64 {
+        self.value
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PostIndex {
+    value: f64,
+}
+
+impl PostIndex {
+    pub fn from_post(post: &Post) -> Option<PostIndex> {
+        let score = post.score().net();
+        if score <= 0 {
+            return None;
+        }
+        Some(PostIndex {
+            value: post.comments().value() as f64 / score as f64,
         })
     }
 
@@ -215,7 +293,7 @@ impl Index {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Points, PostComments, PostId, PostTitle, PostUrl, SourceId};
+    use crate::domain::{Points, PostComments, PostId, PostScore, PostTitle, PostUrl, SourceId};
 
     const HOUR: i64 = 3600;
 
@@ -239,21 +317,59 @@ mod tests {
         Snapshot::new(SourceId::HackerNews, dt(unix), vec![post(comments, score)]).unwrap()
     }
 
-    fn index(comments: i64, score: i64) -> Index {
-        Index::from_posts([&post(comments, score)]).unwrap()
+    fn index(comments: i64, score: i64) -> SnapshotIndex {
+        SnapshotIndex::from_snapshot(&snap(0, comments, score)).unwrap()
     }
 
     #[test]
-    fn index_mean_averages_values() {
+    fn post_index_is_comments_over_net_score() {
+        let p = post(6, 2);
+        assert_eq!(PostIndex::from_post(&p).map(|i| i.value()), Some(3.0));
+    }
+
+    #[test]
+    fn post_index_none_when_score_nonpositive() {
+        let p = post(6, 0);
+        assert_eq!(PostIndex::from_post(&p), None);
+    }
+
+    #[test]
+    fn snapshot_index_averages_post_indexes() {
+        let snap =
+            Snapshot::new(SourceId::HackerNews, dt(0), vec![post(2, 2), post(6, 2)]).unwrap();
+        assert_eq!(
+            SnapshotIndex::from_snapshot(&snap).map(|i| i.value()),
+            Some(2.0)
+        );
+    }
+
+    #[test]
+    fn snapshot_index_skips_nonpositive_posts() {
+        let snap =
+            Snapshot::new(SourceId::HackerNews, dt(0), vec![post(6, 0), post(8, 2)]).unwrap();
+        assert_eq!(
+            SnapshotIndex::from_snapshot(&snap).map(|i| i.value()),
+            Some(4.0)
+        );
+    }
+
+    #[test]
+    fn snapshot_index_none_when_all_posts_nonpositive() {
+        let snap = Snapshot::new(SourceId::HackerNews, dt(0), vec![post(6, 0)]).unwrap();
+        assert_eq!(SnapshotIndex::from_snapshot(&snap), None);
+    }
+
+    #[test]
+    fn snapshot_index_mean_averages_values() {
         let a = index(2, 2);
         let b = index(6, 2);
-        assert_eq!(Index::mean([&a, &b]).map(|i| i.value()), Some(2.0));
+        assert_eq!(SnapshotIndex::mean([&a, &b]).map(|i| i.value()), Some(2.0));
     }
 
     #[test]
-    fn index_mean_none_when_empty() {
-        let empty: [&Index; 0] = [];
-        assert_eq!(Index::mean(empty), None);
+    fn snapshot_index_mean_none_when_empty() {
+        let empty: [&SnapshotIndex; 0] = [];
+        assert_eq!(SnapshotIndex::mean(empty), None);
     }
 
     #[test]

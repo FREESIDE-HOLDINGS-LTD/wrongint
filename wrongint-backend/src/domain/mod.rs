@@ -1,7 +1,9 @@
 pub mod index;
 pub mod time;
 
-pub use index::{Index, IndexCandle, IndexOverTime, Ohlc};
+pub use index::{
+    GlobalIndex, IndexCandle, IndexOverTime, Ohlc, PostIndex, SnapshotIndex, SourceIndex,
+};
 
 use crate::domain::time::{DateTime, Duration};
 use crate::errors::Result;
@@ -447,7 +449,7 @@ mod tests {
                 DateTime::now(),
                 vec![super::make_post(10, PostScore::Points(Points::new(0)?))?],
             )?;
-            assert_eq!(Index::from_snapshot(&snap), None);
+            assert_eq!(SnapshotIndex::from_snapshot(&snap), None);
             Ok(())
         }
 
@@ -464,7 +466,10 @@ mod tests {
                     )?,
                 ],
             )?;
-            assert_eq!(Index::from_snapshot(&snap).map(|i| i.value()), Some(2.0));
+            assert_eq!(
+                SnapshotIndex::from_snapshot(&snap).map(|i| i.value()),
+                Some(2.0)
+            );
             Ok(())
         }
     }

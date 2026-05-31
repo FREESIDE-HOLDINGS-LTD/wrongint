@@ -4,7 +4,7 @@ pub mod get_snapshot;
 pub mod update_metrics;
 
 use crate::domain::time::{DateTime, Duration};
-use crate::domain::{Index, IndexOverTime, Snapshot, Source, SourceId};
+use crate::domain::{IndexOverTime, Snapshot, SnapshotIndex, Source, SourceId};
 use crate::errors::Result;
 use async_trait::async_trait;
 
@@ -102,7 +102,7 @@ pub trait Metrics {
         duration: Duration,
     );
 
-    fn record_index(&self, scope: IndexScope, index: Option<Index>, post_count: usize);
+    fn record_index(&self, scope: IndexScope, index: Option<SnapshotIndex>, post_count: usize);
 }
 
 pub enum ApplicationHandlerCallResult {

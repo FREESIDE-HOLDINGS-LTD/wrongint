@@ -1,6 +1,6 @@
 use crate::app;
 use crate::app::{IndexScope, Metrics, SourceRepository};
-use crate::domain::{Index, Snapshot, SourceId};
+use crate::domain::{GlobalIndex, SourceId, SourceIndex};
 use crate::errors::Result;
 use crate::record_application_handler_call;
 use async_trait::async_trait;
@@ -21,19 +21,21 @@ where
     }
 
     async fn handle_inner(&self) -> Result<()> {
-        let mut snapshots: Vec<Snapshot> = Vec::new();
+        let mut sources: Vec<SourceIndex> = Vec::new();
+        let mut global_posts = 0usize;
 
         for id in SourceId::all() {
             let source = self.sources.get(id)?;
             match source.last_snapshot() {
                 Some(snapshot) => {
-                    let index = Index::from_snapshot(snapshot);
-                    self.metrics.record_index(
-                        IndexScope::Source(id),
-                        index,
-                        snapshot.posts().len(),
-                    );
-                    snapshots.push(snapshot.clone());
+                    let at = snapshot.captured_at();
+                    let count = snapshot.posts().len();
+                    global_posts += count;
+                    let source_index =
+                        SourceIndex::from_snapshots(id, at, at, vec![snapshot.clone()])?;
+                    self.metrics
+                        .record_index(IndexScope::Source(id), source_index.latest(), count);
+                    sources.push(source_index);
                 }
                 None => {
                     self.metrics.record_index(IndexScope::Source(id), None, 0);
@@ -41,10 +43,9 @@ where
             }
         }
 
-        let global_index = Index::from_posts(snapshots.iter().flat_map(Snapshot::posts));
-        let global_posts = snapshots.iter().map(|s| s.posts().len()).sum();
+        let global = GlobalIndex::from_sources(sources);
         self.metrics
-            .record_index(IndexScope::Global, global_index, global_posts);
+            .record_index(IndexScope::Global, global.latest(), global_posts);
 
         Ok(())
     }

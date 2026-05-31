@@ -4,7 +4,7 @@ pub mod sources;
 use crate::app;
 use crate::app::{ApplicationHandlerCallResult, IndexScope};
 use crate::config::Config;
-use crate::domain::Index;
+use crate::domain::SnapshotIndex;
 use crate::domain::time::Duration;
 use crate::errors::Result;
 use prometheus::{CounterVec, GaugeVec, HistogramOpts, HistogramVec, Opts, Registry, labels};
@@ -138,7 +138,7 @@ impl app::Metrics for Metrics {
             .observe(duration.to_std().as_secs_f64());
     }
 
-    fn record_index(&self, scope: IndexScope, index: Option<Index>, post_count: usize) {
+    fn record_index(&self, scope: IndexScope, index: Option<SnapshotIndex>, post_count: usize) {
         let scope = scope.to_string();
         self.metric_index
             .with(&labels! { "source" => scope.as_str() })

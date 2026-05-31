@@ -1,0 +1,65 @@
+<script lang="ts">
+import { defineComponent, type PropType } from 'vue'
+import type { Post } from '../api'
+
+export interface CarouselPost extends Post {
+  source: string
+}
+
+export default defineComponent({
+  name: 'PostsCarousel',
+  props: {
+    posts: { type: Array as PropType<CarouselPost[]>, default: () => [] },
+  },
+  computed: {
+    loop(): CarouselPost[] {
+      return this.posts.length > 0 ? [...this.posts, ...this.posts] : []
+    },
+  },
+  methods: {
+    fmt(v: number | null): string {
+      return v == null ? '——' : v.toFixed(3)
+    },
+    track(): Animation | undefined {
+      const el = this.$refs.track as HTMLElement | undefined
+      return el?.getAnimations?.()[0]
+    },
+    // Ease the marquee's playback rate toward `target` over ~700ms.
+    ramp(target: number) {
+      const anim = this.track()
+      if (!anim) return
+      const start = anim.playbackRate
+      const t0 = performance.now()
+      const dur = 700
+      const step = (now: number) => {
+        const k = Math.min((now - t0) / dur, 1)
+        anim.playbackRate = start + (target - start) * k
+        if (k < 1) requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
+    },
+  },
+})
+</script>
+
+<template>
+  <div class="carousel" @mouseenter="ramp(0.12)" @mouseleave="ramp(1)">
+    <div ref="track" class="carousel-track">
+      <a
+        v-for="(p, i) in loop"
+        :key="i"
+        class="card"
+        :href="p.url"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <span class="card-src">{{ p.source }}</span>
+        <span class="card-title">{{ p.title }}</span>
+        <span class="card-meta">
+          <span class="card-idx">idx {{ fmt(p.index) }}</span>
+          <span class="card-cs">{{ p.comments }}c / {{ p.score }}p</span>
+        </span>
+      </a>
+    </div>
+  </div>
+</template>

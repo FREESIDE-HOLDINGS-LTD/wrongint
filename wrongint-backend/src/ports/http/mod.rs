@@ -2,7 +2,7 @@ use crate::app;
 use crate::app::{GetIndexSeries, IndexScope};
 use crate::config::Config;
 use crate::domain::time::{DateTime, Duration};
-use crate::domain::{Index, IndexCandle, Post, Snapshot, SourceId};
+use crate::domain::{IndexCandle, Post, PostIndex, Snapshot, SourceId};
 use crate::errors::Error;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -342,7 +342,7 @@ impl From<&Post> for ApiPost {
             posted_at: p.posted_at().to_rfc3339(),
             comments: p.comments().value(),
             score: p.score().net(),
-            index: Index::from_posts(std::iter::once(p)).map(|i| i.value()),
+            index: PostIndex::from_post(p).map(|i| i.value()),
         }
     }
 }
