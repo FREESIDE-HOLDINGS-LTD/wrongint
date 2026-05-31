@@ -38,7 +38,7 @@ export default defineComponent({
 </script>
 
 <template>
-  <div v-if="posts.length" class="carousel" @mouseenter="ramp(0.12)" @mouseleave="ramp(1)">
+  <div v-if="posts.length" class="carousel" @mouseenter="ramp(0)" @mouseleave="ramp(1)">
     <div ref="track" class="carousel-track">
       <div v-for="g in 2" :key="g" class="carousel-group">
         <a
@@ -53,7 +53,7 @@ export default defineComponent({
           <span class="card-title">{{ p.title }}</span>
           <span class="card-meta">
             <span class="card-idx">idx {{ fmt(p.index) }}</span>
-            <span class="card-cs">{{ p.comments }}c / {{ p.score }}p</span>
+            <span class="card-cs">{{ p.comments }} comments / {{ p.score }} points</span>
           </span>
         </a>
       </div>

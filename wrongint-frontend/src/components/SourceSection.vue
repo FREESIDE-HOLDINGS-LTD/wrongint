@@ -61,7 +61,9 @@ export default defineComponent({
           <span v-else class="contender-title muted">no data</span>
           <span v-if="item.post" class="contender-meta">
             <span class="contender-idx">idx {{ fmt(item.post.index) }}</span>
-            <span class="contender-cs">{{ item.post.comments }}c / {{ item.post.score }}p</span>
+            <span class="contender-cs"
+              >{{ item.post.comments }} comments / {{ item.post.score }} points</span
+            >
           </span>
         </span>
       </a>
