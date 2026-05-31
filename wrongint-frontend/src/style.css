@@ -144,10 +144,11 @@ body {
 }
 
 .card {
-  display: inline-flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
   gap: 4px;
   width: 300px;
+  height: 92px;
   white-space: normal;
   padding: 8px 10px;
   border: 1px solid #1f262d;
