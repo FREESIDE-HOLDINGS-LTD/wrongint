@@ -1,6 +1,7 @@
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue'
 import { Vue3Marquee } from 'vue3-marquee'
+import DirArrows from './DirArrows.vue'
 import { indexSymbol, sourceColors } from '../api'
 
 export interface TickerItem {
@@ -11,7 +12,7 @@ export interface TickerItem {
 
 export default defineComponent({
   name: 'Ticker',
-  components: { Vue3Marquee },
+  components: { Vue3Marquee, DirArrows },
   props: {
     items: { type: Array as PropType<TickerItem[]>, default: () => [] },
   },
@@ -24,9 +25,6 @@ export default defineComponent({
       if (it.value == null || it.dir === 0) return '#5a6470'
       const c = sourceColors(it.source)
       return it.dir > 0 ? c.up : c.down
-    },
-    arrow(dir: number): string {
-      return dir > 0 ? '▲' : dir < 0 ? '▼' : ''
     },
   },
 })
@@ -42,7 +40,7 @@ export default defineComponent({
         :style="{ color: color(it) }"
       >
         {{ fmt(it.value) }}
-        <span v-if="it.dir !== 0" class="tick-arrow">{{ arrow(it.dir) }}</span>
+        <DirArrows :dir="it.dir" />
       </span>
     </span>
   </Vue3Marquee>

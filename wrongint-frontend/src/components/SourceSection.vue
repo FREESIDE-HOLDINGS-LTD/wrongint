@@ -1,6 +1,7 @@
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue'
 import IndexChart from './IndexChart.vue'
+import DirArrows from './DirArrows.vue'
 import {
   indexSymbol,
   sourceLabel,
@@ -33,7 +34,7 @@ function recentCloses(candles: IndexCandles | null): number[] {
 
 export default defineComponent({
   name: 'SourceSection',
-  components: { IndexChart },
+  components: { IndexChart, DirArrows },
   props: {
     source: { type: String, required: true },
     candles: { type: Object as PropType<IndexCandles | null>, default: null },
@@ -144,7 +145,7 @@ export default defineComponent({
         <span class="section-readout-sym">{{ symbol }}</span>
         <span class="section-readout-num" :class="{ blink: dir > 0 }">
           <span class="section-readout-val">{{ latest == null ? '——' : latest.toFixed(0) }}</span>
-          <span v-if="dir !== 0" class="section-readout-arrow">{{ dir > 0 ? '▲' : '▼' }}</span>
+          <DirArrows :dir="dir" />
         </span>
       </span>
     </h2>

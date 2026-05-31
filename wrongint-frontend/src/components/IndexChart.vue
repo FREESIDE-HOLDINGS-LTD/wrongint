@@ -3,9 +3,11 @@ import { defineComponent, markRaw, type PropType } from 'vue'
 import uPlot from 'uplot'
 import { indexSymbol, sourceColors, type IndexCandles } from '../api'
 import { candlestickPlugin } from '../candlestick'
+import DirArrows from './DirArrows.vue'
 
 export default defineComponent({
   name: 'IndexChart',
+  components: { DirArrows },
   props: {
     source: { type: String, required: true },
     candles: { type: Object as PropType<IndexCandles | null>, default: null },
@@ -132,7 +134,7 @@ export default defineComponent({
       >
         <span class="chart-value-num" :class="{ blink: dir > 0 }">
           {{ latest == null ? '——' : latest.toFixed(0) }}
-          <span v-if="dir !== 0" class="arrow">{{ dir > 0 ? '▲' : '▼' }}</span>
+          <DirArrows :dir="dir" />
         </span>
       </span>
     </div>

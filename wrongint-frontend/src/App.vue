@@ -4,6 +4,7 @@ import IndexChart from './components/IndexChart.vue'
 import Ticker, { type TickerItem } from './components/Ticker.vue'
 import PostsCarousel, { type CarouselPost } from './components/PostsCarousel.vue'
 import SourceSection from './components/SourceSection.vue'
+import DirArrows from './components/DirArrows.vue'
 import {
   fetchIndexCandles,
   fetchSnapshot,
@@ -47,7 +48,7 @@ function dirOf(candles: IndexCandles | null): number {
 
 export default defineComponent({
   name: 'App',
-  components: { IndexChart, Ticker, PostsCarousel, SourceSection },
+  components: { IndexChart, Ticker, PostsCarousel, SourceSection, DirArrows },
   data(): State {
     return {
       global: null,
@@ -154,9 +155,7 @@ export default defineComponent({
           :style="{ color: globalColor }"
         >
           {{ globalValue == null ? '——' : globalValue.toFixed(0) }}
-          <span v-if="globalDir !== 0" class="global-hero-arrow">{{
-            globalDir > 0 ? '▲' : '▼'
-          }}</span>
+          <DirArrows :dir="globalDir" />
         </span>
         <span class="global-hero-label">GLOBAL INTERNET DRAMA INDEX</span>
         <span class="global-hero-sym">{{ globalSymbol }}</span>

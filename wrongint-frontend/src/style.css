@@ -279,10 +279,6 @@ h1 small {
   text-shadow: 0 0 24px currentColor;
 }
 
-.global-hero-arrow {
-  font-size: 40px;
-}
-
 .global-hero-sym {
   color: var(--muted);
   font-size: 13px;
@@ -323,8 +319,45 @@ h1 small {
   color: var(--hot);
 }
 
-.arrow {
-  font-size: 18px;
+/* Number + direction arrows. Center the arrow stack on the number's mid-line
+   (same trick .global-hero-num already uses). */
+.chart-value-num,
+.section-readout-num,
+.tick-value {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  /* Proportional gap so the arrows sit the same distance from the number in the
+     14px ticker as in the big hero, instead of a fixed px that looks huge small. */
+  gap: 0.22em;
+}
+
+/* Elevator-style ▲/▼ stack. Sized relative to the adjacent number (em). The
+   active arrow inherits the readout color; the inactive one is dim grey. */
+.dir-arrows {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  /* Tight stack (matters only for the idle two-grey state). */
+  line-height: 0.62;
+  gap: 0.08em;
+  font-size: 0.72em;
+}
+
+.dir-arrow {
+  color: var(--muted);
+  opacity: 0.35;
+}
+
+/* Non-active arrow while moving: keep its slot so the lit arrow doesn't shift. */
+.dir-arrow.hidden {
+  visibility: hidden;
+}
+
+.dir-arrow.active {
+  color: inherit;
+  opacity: 1;
+  text-shadow: 0 0 8px currentColor;
 }
 
 /* replay a flash whenever the value node is re-keyed */
@@ -395,10 +428,6 @@ a.section-head-name:hover {
 .section-readout-val {
   font-size: 1em;
   font-weight: 800;
-}
-
-.section-readout-arrow {
-  font-size: 0.65em;
 }
 
 /* ---- Contention: a battle line. The most WIRED and most TIRED posts march
