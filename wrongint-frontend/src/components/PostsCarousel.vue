@@ -1,5 +1,6 @@
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue'
+import { Vue3Marquee } from 'vue3-marquee'
 import { sourceLabel, type Post } from '../api'
 import { rangeOf, heat, accent, isHot, type Range } from '../heat'
 
@@ -9,6 +10,7 @@ export interface CarouselPost extends Post {
 
 export default defineComponent({
   name: 'PostsCarousel',
+  components: { Vue3Marquee },
   props: {
     posts: { type: Array as PropType<CarouselPost[]>, default: () => [] },
   },
@@ -33,50 +35,34 @@ export default defineComponent({
     hot(p: CarouselPost): boolean {
       return isHot(heat(p.index, this.ranges[p.source] ?? null))
     },
-    track(): Animation | undefined {
-      const el = this.$refs.track as HTMLElement | undefined
-      return el?.getAnimations?.()[0]
-    },
-    // Ease the marquee's playback rate toward `target` over ~700ms.
-    ramp(target: number) {
-      const anim = this.track()
-      if (!anim) return
-      const start = anim.playbackRate
-      const t0 = performance.now()
-      const dur = 700
-      const step = (now: number) => {
-        const k = Math.min((now - t0) / dur, 1)
-        anim.playbackRate = start + (target - start) * k
-        if (k < 1) requestAnimationFrame(step)
-      }
-      requestAnimationFrame(step)
-    },
   },
 })
 </script>
 
 <template>
-  <div v-if="posts.length" class="carousel" @mouseenter="ramp(0)" @mouseleave="ramp(1)">
-    <div ref="track" class="carousel-track">
-      <div v-for="g in 2" :key="g" class="carousel-group">
-        <a
-          v-for="(p, i) in posts"
-          :key="i"
-          class="card"
-          :class="{ hot: hot(p) }"
-          :style="{ '--accent': accent(p) }"
-          :href="p.comments_url"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <span class="card-src">{{ sourceLabel(p.source) }}</span>
-          <span class="card-title">{{ p.title }}</span>
-          <span class="card-meta">
-            <span class="card-idx">idx {{ fmt(p.index) }}</span>
-            <span class="card-cs">{{ p.comments }} comments / {{ p.score }} points</span>
-          </span>
-        </a>
-      </div>
-    </div>
-  </div>
+  <Vue3Marquee
+    v-if="posts.length"
+    class="carousel"
+    :duration="95"
+    :clone="true"
+    :pause-on-hover="true"
+  >
+    <a
+      v-for="p in posts"
+      :key="p.id"
+      class="card"
+      :class="{ hot: hot(p) }"
+      :style="{ '--accent': accent(p) }"
+      :href="p.comments_url"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <span class="card-src">{{ sourceLabel(p.source) }}</span>
+      <span class="card-title">{{ p.title }}</span>
+      <span class="card-meta">
+        <span class="card-idx">idx {{ fmt(p.index) }}</span>
+        <span class="card-cs">{{ p.comments }} comments / {{ p.score }} points</span>
+      </span>
+    </a>
+  </Vue3Marquee>
 </template>

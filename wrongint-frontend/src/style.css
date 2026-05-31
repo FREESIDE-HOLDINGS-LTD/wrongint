@@ -69,43 +69,17 @@ body {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
 }
 
-/* ---- Ticker tape ---- */
+/* ---- Ticker tape (vue3-marquee handles the scroll/loop) ---- */
 .ticker {
-  overflow: hidden;
-  white-space: nowrap;
   border-bottom: 1px solid rgba(57, 255, 20, 0.3);
   background: #020305;
-}
-
-.ticker-track {
-  display: flex;
-  padding: 8px 0;
-  width: max-content;
-  animation: marquee 16s linear infinite;
-}
-
-/* Each group is at least a full viewport wide and distributes its items
-   evenly, so two stacked groups loop with no blank gap on the right. */
-.ticker-group {
-  display: flex;
-  flex: 0 0 auto;
-  min-width: 100vw;
-  align-items: center;
-  justify-content: space-around;
-}
-
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
 }
 
 .tick {
   font-size: 14px;
   letter-spacing: 1px;
+  padding: 8px 22px;
+  white-space: nowrap;
 }
 
 .tick-label {
@@ -129,31 +103,15 @@ body {
   margin: 0 6px;
 }
 
-/* ---- Posts carousel: a second full-width ticker strip under the index tape ---- */
+/* ---- Posts carousel: a second full-width strip under the index tape ---- */
 .carousel {
-  overflow: hidden;
-  white-space: nowrap;
   border-bottom: 1px solid rgba(57, 255, 20, 0.18);
   background: #020305;
   padding: 8px 0;
 }
 
-.carousel-track {
-  display: flex;
-  width: max-content;
-  animation: marquee 180s linear infinite;
-}
-
-.carousel-group {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 12px;
-  padding: 0 6px;
-  min-width: 100vw;
-  justify-content: space-around;
-}
-
 .card {
+  margin: 0 6px;
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 4px;
@@ -426,12 +384,12 @@ a.section-head-name:hover {
 }
 
 .section-readout-val {
-  font-size: 28px;
+  font-size: 1em;
   font-weight: 800;
 }
 
 .section-readout-arrow {
-  font-size: 18px;
+  font-size: 0.65em;
 }
 
 .contention {

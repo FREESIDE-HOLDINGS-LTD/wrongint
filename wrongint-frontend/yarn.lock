@@ -1112,6 +1112,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"vue3-marquee@npm:^4.2.2":
+  version: 4.2.2
+  resolution: "vue3-marquee@npm:4.2.2"
+  peerDependencies:
+    vue: ^3.2
+  checksum: 10c0/a9ac7ca356b5acdfa8c084b54eb54f0a8f83db6edeffbed2c5907db66630f73824c9a34db1981e28c3079a5a3c2d2bb2dd72a881912ea3a2e3e5d4f008b287d9
+  languageName: node
+  linkType: hard
+
 "vue@npm:^3.5.13":
   version: 3.5.34
   resolution: "vue@npm:3.5.34"
@@ -1151,6 +1160,7 @@ __metadata:
     vite: "npm:^6.0.7"
     vue: "npm:^3.5.13"
     vue-tsc: "npm:^3.2.9"
+    vue3-marquee: "npm:^4.2.2"
   languageName: unknown
   linkType: soft
 

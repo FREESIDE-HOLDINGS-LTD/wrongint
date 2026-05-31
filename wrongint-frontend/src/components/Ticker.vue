@@ -1,5 +1,6 @@
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue'
+import { Vue3Marquee } from 'vue3-marquee'
 import { indexSymbol, sourceColors } from '../api'
 
 export interface TickerItem {
@@ -10,6 +11,7 @@ export interface TickerItem {
 
 export default defineComponent({
   name: 'Ticker',
+  components: { Vue3Marquee },
   props: {
     items: { type: Array as PropType<TickerItem[]>, default: () => [] },
   },
@@ -31,21 +33,17 @@ export default defineComponent({
 </script>
 
 <template>
-  <div class="ticker">
-    <div class="ticker-track">
-      <div v-for="g in 2" :key="g" class="ticker-group">
-        <span v-for="(it, i) in items" :key="i" class="tick">
-          <span class="tick-label">{{ indexSymbol(it.source) }}</span>
-          <span
-            class="tick-value"
-            :class="{ dead: it.value == null, blink: it.dir > 0 }"
-            :style="{ color: color(it) }"
-          >
-            {{ fmt(it.value) }}
-            <span v-if="it.dir !== 0" class="tick-arrow">{{ arrow(it.dir) }}</span>
-          </span>
-        </span>
-      </div>
-    </div>
-  </div>
+  <Vue3Marquee class="ticker" :duration="2" :clone="true" :pause-on-hover="true">
+    <span v-for="it in items" :key="it.source" class="tick">
+      <span class="tick-label">{{ indexSymbol(it.source) }}</span>
+      <span
+        class="tick-value"
+        :class="{ dead: it.value == null, blink: it.dir > 0 }"
+        :style="{ color: color(it) }"
+      >
+        {{ fmt(it.value) }}
+        <span v-if="it.dir !== 0" class="tick-arrow">{{ arrow(it.dir) }}</span>
+      </span>
+    </span>
+  </Vue3Marquee>
 </template>

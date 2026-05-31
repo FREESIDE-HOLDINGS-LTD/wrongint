@@ -106,15 +106,19 @@ export default defineComponent({
         this.hnPosts = hnSnap?.posts ?? []
         this.lobPosts = lobSnap?.posts ?? []
 
+        // Deterministically interleave the sources so they read mixed, not
+        // clustered. Must be stable across refreshes: a random shuffle every
+        // 60s reorders the carousel and makes the marquee jump. Same data ->
+        // same order -> DOM unchanged -> animation keeps running.
+        const lists = [hnSnap?.posts ?? [], lobSnap?.posts ?? []]
+        const sources = [hnSnap?.source, lobSnap?.source]
         const posts: CarouselPost[] = []
-        for (const snap of [hnSnap, lobSnap]) {
-          if (!snap) continue
-          for (const p of snap.posts) posts.push({ ...p, source: snap.source })
-        }
-        // Fisher-Yates shuffle so sources are mixed instead of clustered.
-        for (let i = posts.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1))
-          ;[posts[i], posts[j]] = [posts[j], posts[i]]
+        const max = Math.max(...lists.map((l) => l.length))
+        for (let i = 0; i < max; i++) {
+          for (let s = 0; s < lists.length; s++) {
+            const p = lists[s][i]
+            if (p) posts.push({ ...p, source: sources[s] as string })
+          }
         }
         this.posts = posts
 
