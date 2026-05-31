@@ -1,13 +1,13 @@
 use crate::app::{Point, QueryService, Resolution, Series, SourceSel, SourceStatus};
 use crate::config::Config;
-use crate::domain::{SourceId, Ts};
+use crate::domain::SourceId;
+use crate::domain::time::{DateTime, Duration};
 use crate::errors::Error;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
-use chrono::Duration as ChronoDuration;
 use prometheus::{Registry, TextEncoder};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -94,10 +94,10 @@ async fn handle_metrics(State(state): State<AppState>) -> std::result::Result<St
 }
 
 fn run_query(state: &AppState, sel: SourceSel, params: &ScoreParams) -> Result<Series, ApiError> {
-    let now = chrono::Utc::now();
+    let now = DateTime::now();
     let from = match &params.from {
         Some(s) => parse_ts(s)?,
-        None => now - ChronoDuration::days(DEFAULT_RANGE_DAYS),
+        None => now - Duration::new_from_days(DEFAULT_RANGE_DAYS as u64),
     };
     let to = match &params.to {
         Some(s) => parse_ts(s)?,
@@ -115,17 +115,23 @@ fn run_query(state: &AppState, sel: SourceSel, params: &ScoreParams) -> Result<S
 }
 
 fn parse_source_sel(s: &str) -> Result<SourceSel, ApiError> {
-    if s == "global" {
-        return Ok(SourceSel::Global);
+    match s {
+        "global" => Ok(SourceSel::Global),
+        "hackernews" => Ok(SourceSel::One(SourceId::HackerNews)),
+        "lobsters" => Ok(SourceSel::One(SourceId::Lobsters)),
+        _ => Err(ApiError::BadRequest(format!("unknown source '{s}'"))),
     }
-    SourceId::parse(s)
-        .map(SourceSel::One)
-        .ok_or_else(|| ApiError::BadRequest(format!("unknown source '{s}'")))
 }
 
-fn parse_ts(s: &str) -> Result<Ts, ApiError> {
-    chrono::DateTime::parse_from_rfc3339(s)
-        .map(|dt| dt.with_timezone(&chrono::Utc))
+fn human_name(source: SourceId) -> &'static str {
+    match source {
+        SourceId::HackerNews => "Hacker News",
+        SourceId::Lobsters => "Lobsters",
+    }
+}
+
+fn parse_ts(s: &str) -> Result<DateTime, ApiError> {
+    DateTime::new_from_rfc3339(s)
         .map_err(|_| ApiError::BadRequest(format!("bad timestamp '{s}' (want ISO-8601)")))
 }
 
@@ -142,16 +148,16 @@ struct ApiSource {
     id: String,
     name: String,
     current_score: Option<f64>,
-    last_sample: Option<Ts>,
+    last_sample: Option<String>,
 }
 
 impl From<&SourceStatus> for ApiSource {
     fn from(s: &SourceStatus) -> Self {
         Self {
-            id: s.id.as_str().to_string(),
-            name: s.name.clone(),
+            id: s.id.to_string(),
+            name: human_name(s.id).to_string(),
             current_score: s.current_score,
-            last_sample: s.last_sample,
+            last_sample: s.last_sample.map(|t| t.to_rfc3339()),
         }
     }
 }
@@ -175,7 +181,7 @@ impl From<&Series> for ApiSeries {
 
 #[derive(Serialize)]
 struct ApiPoint {
-    t: Ts,
+    t: String,
     score: Option<f64>,
     comments: i64,
     upvotes: i64,
@@ -184,7 +190,7 @@ struct ApiPoint {
 impl From<&Point> for ApiPoint {
     fn from(p: &Point) -> Self {
         Self {
-            t: p.t,
+            t: p.t.to_rfc3339(),
             score: p.score,
             comments: p.comments,
             upvotes: p.upvotes,

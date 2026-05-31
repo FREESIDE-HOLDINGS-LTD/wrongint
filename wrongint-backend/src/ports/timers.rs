@@ -1,5 +1,5 @@
 use crate::app::IngestService;
-use crate::domain::Ts;
+use crate::domain::time::DateTime;
 use log::info;
 use std::sync::Arc;
 use std::time::Duration;
@@ -20,7 +20,7 @@ impl Scheduler {
         let mut ticker = tokio::time::interval(self.interval);
         loop {
             ticker.tick().await;
-            let tick = truncate_to_seconds(chrono::Utc::now());
+            let tick = DateTime::now();
             let report = self.ingest.ingest_tick(tick).await;
             info!("ingest tick {tick}: {report}");
         }
@@ -31,14 +31,10 @@ impl Scheduler {
         if interval_secs <= 1 {
             return;
         }
-        let now = chrono::Utc::now().timestamp();
+        let now = DateTime::now().unix_timestamp();
         let wait = interval_secs - (now % interval_secs);
         if wait != interval_secs {
             tokio::time::sleep(Duration::from_secs(wait as u64)).await;
         }
     }
-}
-
-fn truncate_to_seconds(ts: Ts) -> Ts {
-    chrono::DateTime::from_timestamp(ts.timestamp(), 0).unwrap_or(ts)
 }

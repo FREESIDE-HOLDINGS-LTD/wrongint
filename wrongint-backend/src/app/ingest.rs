@@ -1,5 +1,6 @@
 use crate::app::{Metrics, Source, Store};
-use crate::domain::{self, PostCapture, Sample, SourceId, Ts};
+use crate::domain::time::DateTime;
+use crate::domain::{self, Post, Snapshot, SourceId};
 use crate::errors::Result;
 use futures::future::join_all;
 use log::warn;
@@ -29,7 +30,7 @@ impl IngestService {
         }
     }
 
-    pub async fn ingest_tick(&self, tick: Ts) -> TickReport {
+    pub async fn ingest_tick(&self, tick: DateTime) -> TickReport {
         let fetches = self.sources.iter().map(|src| async move {
             let id = src.id();
             (id, fetch_with_retries(src.as_ref(), self.retries).await)
@@ -37,39 +38,36 @@ impl IngestService {
         let results = join_all(fetches).await;
 
         let mut report = TickReport::default();
-        let mut global_posts: Vec<PostCapture> = Vec::new();
+        let mut global_posts: Vec<Post> = Vec::new();
 
         for (id, result) in results {
             match result {
-                Ok(mut posts) => {
-                    for p in &mut posts {
-                        p.sampled_at = tick;
-                    }
-                    let sample = Sample {
-                        source: id,
-                        sampled_at: tick,
-                        posts: posts.clone(),
-                    };
-                    match self.store.put_sample(&sample) {
+                Ok(posts) => match Snapshot::new(id, tick, posts.clone()) {
+                    Ok(snapshot) => match self.store.put_snapshot(&snapshot) {
                         Ok(()) => {
                             self.metrics.record_fetch(id, true);
                             self.metrics.set_last_sample(id, tick);
                             self.metrics.set_posts_captured(id, posts.len());
-                            let (c, u) = domain::totals(&posts);
+                            let (c, s) = domain::totals(&posts);
                             self.metrics
-                                .set_score(id.as_str(), domain::wrongint_score(c, u));
+                                .set_score(&id.to_string(), domain::wrongint_score(c, s));
                             global_posts.extend(posts.iter().cloned());
                             report.push(id, Ok(posts.len()));
                         }
                         Err(err) => {
-                            warn!("store failed for {}: {err}", id.as_str());
+                            warn!("store failed for {}: {err}", id);
                             self.metrics.record_fetch(id, false);
                             report.push(id, Err(()));
                         }
+                    },
+                    Err(err) => {
+                        warn!("dropping snapshot for {}: {err}", id);
+                        self.metrics.record_fetch(id, false);
+                        report.push(id, Err(()));
                     }
-                }
+                },
                 Err(err) => {
-                    warn!("fetch failed for {}: {err}", id.as_str());
+                    warn!("fetch failed for {}: {err}", id);
                     self.metrics.record_fetch(id, false);
                     report.push(id, Err(()));
                 }
@@ -84,7 +82,7 @@ impl IngestService {
     }
 }
 
-async fn fetch_with_retries(src: &dyn Source, retries: u32) -> Result<Vec<PostCapture>> {
+async fn fetch_with_retries(src: &dyn Source, retries: u32) -> Result<Vec<Post>> {
     let mut attempt = 0;
     loop {
         match src.fetch_front_page().await {
@@ -96,7 +94,7 @@ async fn fetch_with_retries(src: &dyn Source, retries: u32) -> Result<Vec<PostCa
                 attempt += 1;
                 warn!(
                     "fetch attempt {attempt} for {} failed, retrying: {err}",
-                    src.id().as_str()
+                    src.id()
                 );
                 tokio::time::sleep(Duration::from_millis(500)).await;
             }
@@ -125,8 +123,8 @@ impl fmt::Display for TickReport {
             .per_source
             .iter()
             .map(|(id, r)| match r {
-                Ok(n) => format!("{}={n}", id.as_str()),
-                Err(()) => format!("{}=err", id.as_str()),
+                Ok(n) => format!("{}={n}", id),
+                Err(()) => format!("{}=err", id),
             })
             .collect();
         write!(f, "[{}]", parts.join(" "))

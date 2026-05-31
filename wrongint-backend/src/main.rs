@@ -7,6 +7,8 @@ use wrongint_backend::adapters::sources::{HackerNews, Lobsters, new_client};
 use wrongint_backend::adapters::{ConfigLoader, Metrics, db};
 use wrongint_backend::app::{self, IngestService, QueryService};
 use wrongint_backend::config::Config;
+use wrongint_backend::domain::SourceId;
+use wrongint_backend::domain::time::DateTime;
 use wrongint_backend::errors::Result;
 use wrongint_backend::ports::http::{self, AppState};
 use wrongint_backend::ports::timers::Scheduler;
@@ -45,7 +47,7 @@ async fn run(config_path: &str, sample_now: bool) -> Result<()> {
     let service = Service::new(&config)?;
 
     if sample_now {
-        let report = service.ingest.ingest_tick(chrono::Utc::now()).await;
+        let report = service.ingest.ingest_tick(DateTime::now()).await;
         info!("startup --sample-now tick: {report}");
     }
 
@@ -91,7 +93,10 @@ impl<'a> Service<'a> {
             metrics,
             config.request_retries(),
         ));
-        let query = Arc::new(QueryService::new(store));
+        let query = Arc::new(QueryService::new(
+            store,
+            vec![SourceId::HackerNews, SourceId::Lobsters],
+        ));
 
         let state = AppState::new(query, registry);
         let http_server = http::Server::new(config, state);

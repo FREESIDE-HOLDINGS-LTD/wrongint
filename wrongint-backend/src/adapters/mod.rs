@@ -3,7 +3,8 @@ pub mod sources;
 
 use crate::app;
 use crate::config::Config;
-use crate::domain::{SourceId, Ts};
+use crate::domain::SourceId;
+use crate::domain::time::DateTime;
 use crate::errors::Result;
 use prometheus::{CounterVec, GaugeVec, Opts, Registry, labels};
 use serde::Deserialize;
@@ -109,6 +110,7 @@ impl Metrics {
 
 impl app::Metrics for Metrics {
     fn record_fetch(&self, source: SourceId, ok: bool) {
+        let source = source.to_string();
         let result = if ok { "ok" } else { "err" };
         self.fetch_total
             .with(&labels! { "source" => source.as_str(), "result" => result })
@@ -121,13 +123,15 @@ impl app::Metrics for Metrics {
             .set(score.unwrap_or(f64::NAN));
     }
 
-    fn set_last_sample(&self, source: SourceId, ts: Ts) {
+    fn set_last_sample(&self, source: SourceId, ts: DateTime) {
+        let source = source.to_string();
         self.last_sample_timestamp
             .with(&labels! { "source" => source.as_str() })
-            .set(ts.timestamp() as f64);
+            .set(ts.unix_timestamp() as f64);
     }
 
     fn set_posts_captured(&self, source: SourceId, count: usize) {
+        let source = source.to_string();
         self.posts_captured
             .with(&labels! { "source" => source.as_str() })
             .set(count as f64);

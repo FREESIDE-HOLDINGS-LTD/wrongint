@@ -1,5 +1,5 @@
 use crate::app;
-use crate::domain::{PostCapture, SourceId};
+use crate::domain::{NumberOfComments, Post, PostId, Score, SourceId, Title, Url};
 use crate::errors::Result;
 use async_trait::async_trait;
 use futures::stream::StreamExt;
@@ -49,32 +49,32 @@ struct HnItem {
 }
 
 impl HnItem {
-    fn into_capture(self) -> Option<PostCapture> {
+    fn into_post(self) -> Option<Post> {
         if self.dead || self.deleted {
             return None;
         }
         if self.kind.as_deref() != Some("story") {
             return None;
         }
-        Some(PostCapture {
-            source: SourceId::Hn,
-            post_id: self.id.to_string(),
-            title: self.title,
-            url: self.url.unwrap_or_else(|| HackerNews::permalink(self.id)),
-            comments: self.descendants,
-            upvotes: self.score,
-            sampled_at: chrono::Utc::now(),
-        })
+        let url = self.url.unwrap_or_else(|| HackerNews::permalink(self.id));
+        Some(Post::new(
+            SourceId::HackerNews,
+            PostId::new(self.id.to_string()).ok()?,
+            Title::new(self.title),
+            Url::new(url),
+            NumberOfComments::new(self.descendants),
+            Score::Points(self.score),
+        ))
     }
 }
 
 #[async_trait]
 impl app::Source for HackerNews {
     fn id(&self) -> SourceId {
-        SourceId::Hn
+        SourceId::HackerNews
     }
 
-    async fn fetch_front_page(&self) -> Result<Vec<PostCapture>> {
+    async fn fetch_front_page(&self) -> Result<Vec<Post>> {
         let ids: Vec<i64> = self
             .client
             .get(TOP_STORIES_URL)
@@ -86,7 +86,7 @@ impl app::Source for HackerNews {
 
         let front: Vec<i64> = ids.into_iter().take(self.front_page_len).collect();
 
-        let items: Vec<Option<PostCapture>> = futures::stream::iter(front)
+        let items: Vec<Option<Post>> = futures::stream::iter(front)
             .map(|id| {
                 let client = self.client.clone();
                 async move {
@@ -97,7 +97,7 @@ impl app::Source for HackerNews {
                         .error_for_status()?
                         .json()
                         .await?;
-                    Ok::<Option<PostCapture>, crate::errors::Error>(item.into_capture())
+                    Ok::<Option<Post>, crate::errors::Error>(item.into_post())
                 }
             })
             .buffer_unordered(ITEM_CONCURRENCY)
@@ -119,19 +119,22 @@ mod tests {
         let json = r#"{"id":1,"type":"story","score":100,"descendants":42,
             "title":"hello","url":"https://example.com"}"#;
         let item: HnItem = serde_json::from_str(json).unwrap();
-        let cap = item.into_capture().unwrap();
-        assert_eq!(cap.post_id, "1");
-        assert_eq!(cap.upvotes, 100);
-        assert_eq!(cap.comments, 42);
-        assert_eq!(cap.url, "https://example.com");
+        let post = item.into_post().unwrap();
+        assert_eq!(post.post_id().as_str(), "1");
+        assert_eq!(post.score(), Score::Points(100));
+        assert_eq!(post.comments().value(), 42);
+        assert_eq!(post.url().as_str(), "https://example.com");
     }
 
     #[test]
     fn self_post_uses_permalink() {
         let json = r#"{"id":7,"type":"story","score":5,"descendants":0,"title":"ask"}"#;
         let item: HnItem = serde_json::from_str(json).unwrap();
-        let cap = item.into_capture().unwrap();
-        assert_eq!(cap.url, "https://news.ycombinator.com/item?id=7");
+        let post = item.into_post().unwrap();
+        assert_eq!(
+            post.url().as_str(),
+            "https://news.ycombinator.com/item?id=7"
+        );
     }
 
     #[test]
@@ -140,14 +143,14 @@ mod tests {
         assert!(
             serde_json::from_str::<HnItem>(job)
                 .unwrap()
-                .into_capture()
+                .into_post()
                 .is_none()
         );
         let dead = r#"{"id":3,"type":"story","score":1,"dead":true}"#;
         assert!(
             serde_json::from_str::<HnItem>(dead)
                 .unwrap()
-                .into_capture()
+                .into_post()
                 .is_none()
         );
     }

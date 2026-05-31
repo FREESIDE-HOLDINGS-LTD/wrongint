@@ -1,5 +1,5 @@
 use crate::app;
-use crate::domain::{PostCapture, SourceId};
+use crate::domain::{NumberOfComments, Post, PostId, Score, SourceId, Title, Url};
 use crate::errors::Result;
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -30,16 +30,15 @@ struct LobstersItem {
 }
 
 impl LobstersItem {
-    fn into_capture(self) -> PostCapture {
-        PostCapture {
-            source: SourceId::Lobsters,
-            post_id: self.short_id,
-            title: self.title,
-            url: self.url,
-            comments: self.comment_count,
-            upvotes: self.score,
-            sampled_at: chrono::Utc::now(),
-        }
+    fn into_post(self) -> Option<Post> {
+        Some(Post::new(
+            SourceId::Lobsters,
+            PostId::new(self.short_id).ok()?,
+            Title::new(self.title),
+            Url::new(self.url),
+            NumberOfComments::new(self.comment_count),
+            Score::UpvotesAndDownvotes(self.score),
+        ))
     }
 }
 
@@ -49,7 +48,7 @@ impl app::Source for Lobsters {
         SourceId::Lobsters
     }
 
-    async fn fetch_front_page(&self) -> Result<Vec<PostCapture>> {
+    async fn fetch_front_page(&self) -> Result<Vec<Post>> {
         let items: Vec<LobstersItem> = self
             .client
             .get(HOTTEST_URL)
@@ -59,7 +58,10 @@ impl app::Source for Lobsters {
             .json()
             .await?;
 
-        Ok(items.into_iter().map(LobstersItem::into_capture).collect())
+        Ok(items
+            .into_iter()
+            .filter_map(LobstersItem::into_post)
+            .collect())
     }
 }
 
@@ -74,11 +76,11 @@ mod tests {
             {"short_id":"def","title":"y","url":"https://e.com/b","score":-2,"comment_count":40}
         ]"#;
         let items: Vec<LobstersItem> = serde_json::from_str(json).unwrap();
-        let caps: Vec<PostCapture> = items.into_iter().map(|i| i.into_capture()).collect();
-        assert_eq!(caps.len(), 2);
-        assert_eq!(caps[0].post_id, "abc");
-        assert_eq!(caps[0].upvotes, 12);
-        assert_eq!(caps[1].upvotes, -2);
-        assert_eq!(caps[1].comments, 40);
+        let posts: Vec<Post> = items.into_iter().filter_map(|i| i.into_post()).collect();
+        assert_eq!(posts.len(), 2);
+        assert_eq!(posts[0].post_id().as_str(), "abc");
+        assert_eq!(posts[0].score(), Score::UpvotesAndDownvotes(12));
+        assert_eq!(posts[1].score(), Score::UpvotesAndDownvotes(-2));
+        assert_eq!(posts[1].comments().value(), 40);
     }
 }

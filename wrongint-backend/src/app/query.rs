@@ -1,11 +1,13 @@
 use crate::app::Store;
-use crate::domain::{self, PostCapture, SourceId, Ts};
+use crate::domain::time::DateTime;
+use crate::domain::{self, Post, SourceId};
 use crate::errors::Result;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 pub struct QueryService {
     store: Arc<dyn Store>,
+    sources: Vec<SourceId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,7 +41,7 @@ impl Resolution {
 
 #[derive(Debug, Clone)]
 pub struct Point {
-    pub t: Ts,
+    pub t: DateTime,
     pub score: Option<f64>,
     pub comments: i64,
     pub upvotes: i64,
@@ -55,22 +57,27 @@ pub struct Series {
 #[derive(Debug, Clone)]
 pub struct SourceStatus {
     pub id: SourceId,
-    pub name: String,
     pub current_score: Option<f64>,
-    pub last_sample: Option<Ts>,
+    pub last_sample: Option<DateTime>,
 }
 
 impl QueryService {
-    pub fn new(store: Arc<dyn Store>) -> Self {
-        Self { store }
+    pub fn new(store: Arc<dyn Store>, sources: Vec<SourceId>) -> Self {
+        Self { store, sources }
     }
 
-    pub fn scores(&self, sel: SourceSel, from: Ts, to: Ts, res: Resolution) -> Result<Series> {
-        let posts = match sel {
+    pub fn scores(
+        &self,
+        sel: SourceSel,
+        from: DateTime,
+        to: DateTime,
+        res: Resolution,
+    ) -> Result<Series> {
+        let captures = match sel {
             SourceSel::One(source) => self.store.captures_in_range(source, from, to)?,
             SourceSel::Global => {
                 let mut all = Vec::new();
-                for source in SourceId::all() {
+                for source in &self.sources {
                     all.extend(self.store.captures_in_range(*source, from, to)?);
                 }
                 all
@@ -78,32 +85,36 @@ impl QueryService {
         };
 
         let label = match sel {
-            SourceSel::One(s) => s.as_str().to_string(),
+            SourceSel::One(s) => s.to_string(),
             SourceSel::Global => "global".to_string(),
         };
 
         Ok(Series {
             source: label,
             resolution: res,
-            points: bucket_and_score(&posts, res),
+            points: bucket_and_score(&captures, res)?,
         })
     }
 
     pub fn sources_overview(&self) -> Result<Vec<SourceStatus>> {
         let mut out = Vec::new();
-        for source in SourceId::all() {
+        for source in &self.sources {
             let last_sample = self.store.latest_sample_ts(*source)?;
             let current_score = match last_sample {
                 Some(ts) => {
-                    let posts = self.store.captures_in_range(*source, ts, ts)?;
-                    let (c, u) = domain::totals(&posts);
-                    domain::wrongint_score(c, u)
+                    let posts: Vec<Post> = self
+                        .store
+                        .captures_in_range(*source, ts, ts)?
+                        .into_iter()
+                        .map(|(_, p)| p)
+                        .collect();
+                    let (c, s) = domain::totals(&posts);
+                    domain::wrongint_score(c, s)
                 }
                 None => None,
             };
             out.push(SourceStatus {
                 id: *source,
-                name: source.display_name().to_string(),
                 current_score,
                 last_sample,
             });
@@ -112,16 +123,16 @@ impl QueryService {
     }
 }
 
-fn bucket_and_score(posts: &[PostCapture], res: Resolution) -> Vec<Point> {
-    let mut buckets: BTreeMap<Ts, (i64, i64)> = BTreeMap::new();
-    for p in posts {
-        let key = bucket_key(p.sampled_at, res);
+fn bucket_and_score(captures: &[(DateTime, Post)], res: Resolution) -> Result<Vec<Point>> {
+    let mut buckets: BTreeMap<DateTime, (i64, i64)> = BTreeMap::new();
+    for (at, post) in captures {
+        let key = bucket_key(*at, res)?;
         let entry = buckets.entry(key).or_insert((0, 0));
-        entry.0 += p.comments;
-        entry.1 += p.upvotes;
+        entry.0 += post.comments().value();
+        entry.1 += post.score().value();
     }
 
-    buckets
+    Ok(buckets
         .into_iter()
         .map(|(t, (comments, upvotes))| Point {
             t,
@@ -129,13 +140,13 @@ fn bucket_and_score(posts: &[PostCapture], res: Resolution) -> Vec<Point> {
             comments,
             upvotes,
         })
-        .collect()
+        .collect())
 }
 
-fn bucket_key(ts: Ts, res: Resolution) -> Ts {
+fn bucket_key(at: DateTime, res: Resolution) -> Result<DateTime> {
     match res {
-        Resolution::Hour => ts,
-        Resolution::Day => ts.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc(),
+        Resolution::Hour => Ok(at),
+        Resolution::Day => at.truncate_to_day(),
     }
 }
 
@@ -143,92 +154,95 @@ fn bucket_key(ts: Ts, res: Resolution) -> Ts {
 mod tests {
     use super::*;
     use crate::app::Store;
-    use chrono::TimeZone;
+    use crate::domain::{NumberOfComments, PostId, Score, Snapshot, Title, Url};
     use std::sync::Mutex;
 
-    fn ts(h: u32, m: u32) -> Ts {
-        chrono::Utc.with_ymd_and_hms(2026, 5, 31, h, m, 0).unwrap()
+    fn ts(h: i64) -> DateTime {
+        DateTime::new_from_unix_timestamp(1_780_000_000 + h * 3600).unwrap()
     }
 
-    fn post(source: SourceId, c: i64, u: i64, at: Ts) -> PostCapture {
-        PostCapture {
+    fn post(source: SourceId, c: i64, s: i64) -> Post {
+        Post::new(
             source,
-            post_id: format!("{c}-{u}"),
-            title: "t".into(),
-            url: "u".into(),
-            comments: c,
-            upvotes: u,
-            sampled_at: at,
-        }
+            PostId::new(format!("{c}-{s}")).unwrap(),
+            Title::new("t"),
+            Url::new("u"),
+            NumberOfComments::new(c),
+            Score::Points(s),
+        )
     }
 
     #[derive(Default)]
     struct FakeStore {
-        rows: Mutex<Vec<PostCapture>>,
+        rows: Mutex<Vec<(DateTime, Post)>>,
     }
 
     impl Store for FakeStore {
-        fn put_sample(&self, sample: &crate::domain::Sample) -> Result<()> {
-            self.rows
-                .lock()
-                .unwrap()
-                .extend(sample.posts.iter().cloned());
+        fn put_snapshot(&self, snapshot: &Snapshot) -> Result<()> {
+            let mut rows = self.rows.lock().unwrap();
+            for post in snapshot.posts() {
+                rows.push((snapshot.captured_at(), post.clone()));
+            }
             Ok(())
         }
         fn captures_in_range(
             &self,
             source: SourceId,
-            from: Ts,
-            to: Ts,
-        ) -> Result<Vec<PostCapture>> {
+            from: DateTime,
+            to: DateTime,
+        ) -> Result<Vec<(DateTime, Post)>> {
             Ok(self
                 .rows
                 .lock()
                 .unwrap()
                 .iter()
-                .filter(|p| p.source == source && p.sampled_at >= from && p.sampled_at <= to)
+                .filter(|(at, p)| p.source() == source && *at >= from && *at <= to)
                 .cloned()
                 .collect())
         }
-        fn latest_sample_ts(&self, source: SourceId) -> Result<Option<Ts>> {
+        fn latest_sample_ts(&self, source: SourceId) -> Result<Option<DateTime>> {
             Ok(self
                 .rows
                 .lock()
                 .unwrap()
                 .iter()
-                .filter(|p| p.source == source)
-                .map(|p| p.sampled_at)
+                .filter(|(_, p)| p.source() == source)
+                .map(|(at, _)| *at)
                 .max())
         }
+    }
+
+    fn snap(source: SourceId, at: DateTime, posts: Vec<Post>) -> Snapshot {
+        Snapshot::new(source, at, posts).unwrap()
     }
 
     #[test]
     fn hour_resolution_one_point_per_tick() {
         let store = Arc::new(FakeStore::default());
         store
-            .put_sample(&crate::domain::Sample {
-                source: SourceId::Hn,
-                sampled_at: ts(13, 0),
-                posts: vec![
-                    post(SourceId::Hn, 4, 2, ts(13, 0)),
-                    post(SourceId::Hn, 6, 3, ts(13, 0)),
+            .put_snapshot(&snap(
+                SourceId::HackerNews,
+                ts(13),
+                vec![
+                    post(SourceId::HackerNews, 4, 2),
+                    post(SourceId::HackerNews, 6, 3),
                 ],
-            })
+            ))
             .unwrap();
         store
-            .put_sample(&crate::domain::Sample {
-                source: SourceId::Hn,
-                sampled_at: ts(14, 0),
-                posts: vec![post(SourceId::Hn, 10, 0, ts(14, 0))],
-            })
+            .put_snapshot(&snap(
+                SourceId::HackerNews,
+                ts(14),
+                vec![post(SourceId::HackerNews, 10, 0)],
+            ))
             .unwrap();
 
-        let q = QueryService::new(store);
+        let q = QueryService::new(store, vec![SourceId::HackerNews, SourceId::Lobsters]);
         let series = q
             .scores(
-                SourceSel::One(SourceId::Hn),
-                ts(0, 0),
-                ts(23, 0),
+                SourceSel::One(SourceId::HackerNews),
+                ts(0),
+                ts(23),
                 Resolution::Hour,
             )
             .unwrap();
@@ -241,23 +255,23 @@ mod tests {
     fn global_pools_across_sources_per_tick() {
         let store = Arc::new(FakeStore::default());
         store
-            .put_sample(&crate::domain::Sample {
-                source: SourceId::Hn,
-                sampled_at: ts(13, 0),
-                posts: vec![post(SourceId::Hn, 10, 5, ts(13, 0))],
-            })
+            .put_snapshot(&snap(
+                SourceId::HackerNews,
+                ts(13),
+                vec![post(SourceId::HackerNews, 10, 5)],
+            ))
             .unwrap();
         store
-            .put_sample(&crate::domain::Sample {
-                source: SourceId::Lobsters,
-                sampled_at: ts(13, 0),
-                posts: vec![post(SourceId::Lobsters, 2, 5, ts(13, 0))],
-            })
+            .put_snapshot(&snap(
+                SourceId::Lobsters,
+                ts(13),
+                vec![post(SourceId::Lobsters, 2, 5)],
+            ))
             .unwrap();
 
-        let q = QueryService::new(store);
+        let q = QueryService::new(store, vec![SourceId::HackerNews, SourceId::Lobsters]);
         let series = q
-            .scores(SourceSel::Global, ts(0, 0), ts(23, 0), Resolution::Hour)
+            .scores(SourceSel::Global, ts(0), ts(23), Resolution::Hour)
             .unwrap();
         assert_eq!(series.points.len(), 1);
         assert_eq!(series.points[0].score, Some(1.2));
@@ -267,26 +281,26 @@ mod tests {
     fn day_resolution_pools_raw_posts() {
         let store = Arc::new(FakeStore::default());
         store
-            .put_sample(&crate::domain::Sample {
-                source: SourceId::Hn,
-                sampled_at: ts(13, 0),
-                posts: vec![post(SourceId::Hn, 10, 5, ts(13, 0))],
-            })
+            .put_snapshot(&snap(
+                SourceId::HackerNews,
+                ts(13),
+                vec![post(SourceId::HackerNews, 10, 5)],
+            ))
             .unwrap();
         store
-            .put_sample(&crate::domain::Sample {
-                source: SourceId::Hn,
-                sampled_at: ts(14, 0),
-                posts: vec![post(SourceId::Hn, 2, 5, ts(14, 0))],
-            })
+            .put_snapshot(&snap(
+                SourceId::HackerNews,
+                ts(14),
+                vec![post(SourceId::HackerNews, 2, 5)],
+            ))
             .unwrap();
 
-        let q = QueryService::new(store);
+        let q = QueryService::new(store, vec![SourceId::HackerNews, SourceId::Lobsters]);
         let series = q
             .scores(
-                SourceSel::One(SourceId::Hn),
-                ts(0, 0),
-                ts(23, 0),
+                SourceSel::One(SourceId::HackerNews),
+                ts(0),
+                ts(23),
                 Resolution::Day,
             )
             .unwrap();
