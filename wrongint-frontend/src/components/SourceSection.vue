@@ -1,7 +1,14 @@
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue'
 import IndexChart from './IndexChart.vue'
-import { indexSymbol, sourceLabel, sourceColors, type IndexCandles, type Post } from '../api'
+import {
+  indexSymbol,
+  sourceLabel,
+  sourceUrl,
+  sourceColors,
+  type IndexCandles,
+  type Post,
+} from '../api'
 import { rangeOf, heat, accent, isHot, type Range } from '../heat'
 
 // Last two non-null closes, newest first.
@@ -28,6 +35,9 @@ export default defineComponent({
     },
     label(): string {
       return sourceLabel(this.source)
+    },
+    url(): string | null {
+      return sourceUrl(this.source)
     },
     headColor(): string {
       return sourceColors(this.source).up
@@ -79,7 +89,16 @@ export default defineComponent({
 <template>
   <section class="source-section">
     <h2 class="section-head" :style="{ color: headColor, borderColor: headColor }">
-      <span class="section-head-name"><span class="section-head-mark">▌</span>{{ label }}</span>
+      <a
+        v-if="url"
+        class="section-head-name"
+        :href="url"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <span class="section-head-mark">▌</span>{{ label }}
+      </a>
+      <span v-else class="section-head-name"><span class="section-head-mark">▌</span>{{ label }}</span>
       <span class="section-readout" :style="{ color: readoutColor }">
         <span class="section-readout-sym">{{ symbol }}</span>
         <span class="section-readout-num" :class="{ blink: dir > 0 }">

@@ -2,13 +2,13 @@ export type IndexSource = 'all' | 'hackernews' | 'lobsters'
 
 // Ticker-style identifier for each index; used everywhere an index is named.
 export const INDEX_SYMBOLS: Record<string, string> = {
-  all: 'idx:global',
-  hackernews: 'idx:hn',
-  lobsters: 'idx:lob',
+  all: 'IDX:GLOBAL',
+  hackernews: 'IDX:HN',
+  lobsters: 'IDX:LOB',
 }
 
 export function indexSymbol(source: string): string {
-  return INDEX_SYMBOLS[source] ?? `idx:${source.toLowerCase()}`
+  return INDEX_SYMBOLS[source] ?? `IDX:${source.toUpperCase()}`
 }
 
 // Full display names; used for section headers.
@@ -20,6 +20,16 @@ export const SOURCE_LABELS: Record<string, string> = {
 
 export function sourceLabel(source: string): string {
   return SOURCE_LABELS[source] ?? source.toUpperCase()
+}
+
+// Home pages we sample from; used to link section headers out.
+export const SOURCE_URLS: Record<string, string> = {
+  hackernews: 'https://news.ycombinator.com',
+  lobsters: 'https://lobste.rs',
+}
+
+export function sourceUrl(source: string): string | null {
+  return SOURCE_URLS[source] ?? null
 }
 
 // Per-index up/down colors. Up is the bright brand tone, down its dark variant.
