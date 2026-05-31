@@ -30,7 +30,7 @@ export default defineComponent({
       return list[0] ?? null
     },
     fmt(v: number | null): string {
-      return v == null ? '——' : v.toFixed(3)
+      return v == null ? '——' : v.toFixed(0)
     },
   },
 })

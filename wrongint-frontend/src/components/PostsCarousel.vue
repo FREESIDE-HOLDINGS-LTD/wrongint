@@ -13,7 +13,7 @@ export default defineComponent({
   },
   methods: {
     fmt(v: number | null): string {
-      return v == null ? '——' : v.toFixed(3)
+      return v == null ? '——' : v.toFixed(0)
     },
     track(): Animation | undefined {
       const el = this.$refs.track as HTMLElement | undefined

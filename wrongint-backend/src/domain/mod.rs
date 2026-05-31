@@ -503,7 +503,7 @@ mod tests {
             )?;
             assert_eq!(
                 SnapshotIndex::from_snapshot(&snap).map(|i| i.value()),
-                Some(2.0)
+                Some(2000.0)
             );
             Ok(())
         }

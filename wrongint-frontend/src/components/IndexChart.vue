@@ -115,7 +115,7 @@ export default defineComponent({
         class="chart-value flash"
         :class="{ up: dir > 0, down: dir < 0, dead: latest == null }"
       >
-        {{ latest == null ? '——' : latest.toFixed(3) }}
+        {{ latest == null ? '——' : latest.toFixed(0) }}
         <span v-if="dir !== 0" class="arrow">{{ dir > 0 ? '▲' : '▼' }}</span>
       </span>
     </div>

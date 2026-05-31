@@ -281,7 +281,7 @@ impl PostIndex {
             return None;
         }
         Some(PostIndex {
-            value: post.comments().value() as f64 / score as f64,
+            value: post.comments().value() as f64 / score as f64 * 1000.0,
         })
     }
 
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn post_index_is_comments_over_net_score() {
         let p = post(6, 2);
-        assert_eq!(PostIndex::from_post(&p).map(|i| i.value()), Some(3.0));
+        assert_eq!(PostIndex::from_post(&p).map(|i| i.value()), Some(3000.0));
     }
 
     #[test]
@@ -341,7 +341,7 @@ mod tests {
             Snapshot::new(SourceId::HackerNews, dt(0), vec![post(2, 2), post(6, 2)]).unwrap();
         assert_eq!(
             SnapshotIndex::from_snapshot(&snap).map(|i| i.value()),
-            Some(2.0)
+            Some(2000.0)
         );
     }
 
@@ -351,7 +351,7 @@ mod tests {
             Snapshot::new(SourceId::HackerNews, dt(0), vec![post(6, 0), post(8, 2)]).unwrap();
         assert_eq!(
             SnapshotIndex::from_snapshot(&snap).map(|i| i.value()),
-            Some(4.0)
+            Some(4000.0)
         );
     }
 
@@ -365,7 +365,10 @@ mod tests {
     fn snapshot_index_mean_averages_values() {
         let a = index(2, 2);
         let b = index(6, 2);
-        assert_eq!(SnapshotIndex::mean([&a, &b]).map(|i| i.value()), Some(2.0));
+        assert_eq!(
+            SnapshotIndex::mean([&a, &b]).map(|i| i.value()),
+            Some(2000.0)
+        );
     }
 
     #[test]
@@ -378,10 +381,10 @@ mod tests {
     fn ohlc_from_samples_picks_open_high_low_close() {
         let samples = [index(2, 2), index(6, 2), index(4, 2), index(3, 2)];
         let o = Ohlc::from_samples(&samples).unwrap();
-        assert_eq!(o.open().value(), 1.0);
-        assert_eq!(o.high().value(), 3.0);
-        assert_eq!(o.low().value(), 1.0);
-        assert_eq!(o.close().value(), 1.5);
+        assert_eq!(o.open().value(), 1000.0);
+        assert_eq!(o.high().value(), 3000.0);
+        assert_eq!(o.low().value(), 1000.0);
+        assert_eq!(o.close().value(), 1500.0);
     }
 
     #[test]
@@ -395,10 +398,10 @@ mod tests {
         let b =
             Ohlc::from_samples(&[index(8, 2), index(16, 2), index(6, 2), index(10, 2)]).unwrap();
         let m = Ohlc::mean(&[a, b]).unwrap();
-        assert_eq!(m.open().value(), 3.0);
-        assert_eq!(m.high().value(), 6.0);
-        assert_eq!(m.low().value(), 2.0);
-        assert_eq!(m.close().value(), 4.0);
+        assert_eq!(m.open().value(), 3000.0);
+        assert_eq!(m.high().value(), 6000.0);
+        assert_eq!(m.low().value(), 2000.0);
+        assert_eq!(m.close().value(), 4000.0);
     }
 
     #[test]
@@ -419,10 +422,10 @@ mod tests {
         assert_eq!(candles.len(), 2);
 
         let first = candles[0].ohlc().unwrap();
-        assert_eq!(first.open().value(), 2.0);
-        assert_eq!(first.close().value(), 1.0);
-        assert_eq!(first.high().value(), 2.0);
-        assert_eq!(first.low().value(), 1.0);
+        assert_eq!(first.open().value(), 2000.0);
+        assert_eq!(first.close().value(), 1000.0);
+        assert_eq!(first.high().value(), 2000.0);
+        assert_eq!(first.low().value(), 1000.0);
 
         assert_eq!(candles[1].ohlc(), None);
     }
@@ -446,11 +449,11 @@ mod tests {
         assert_eq!(candles.len(), 3);
 
         let hour0 = candles[0].ohlc().unwrap();
-        assert_eq!(hour0.open().value(), 3.0);
-        assert_eq!(hour0.close().value(), 3.0);
+        assert_eq!(hour0.open().value(), 3000.0);
+        assert_eq!(hour0.close().value(), 3000.0);
 
         let hour1 = candles[1].ohlc().unwrap();
-        assert_eq!(hour1.open().value(), 6.0);
+        assert_eq!(hour1.open().value(), 6000.0);
 
         assert_eq!(candles[2].ohlc(), None);
     }

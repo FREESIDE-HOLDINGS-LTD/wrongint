@@ -79,7 +79,11 @@ export default defineComponent({
           if (!snap) continue
           for (const p of snap.posts) posts.push({ ...p, source: snap.source })
         }
-        posts.sort((a, b) => (b.index ?? -1) - (a.index ?? -1))
+        // Fisher-Yates shuffle so sources are mixed instead of clustered.
+        for (let i = posts.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1))
+          ;[posts[i], posts[j]] = [posts[j], posts[i]]
+        }
         this.posts = posts
 
         this.error = null
