@@ -32,10 +32,7 @@ impl ConfigLoader {
 struct TomlConfig {
     http_address: String,
     database_path: String,
-    sample_interval_secs: u64,
     request_timeout_secs: u64,
-    request_retries: u32,
-    hn_front_page_len: usize,
     user_agent: String,
 }
 
@@ -46,10 +43,7 @@ impl TryFrom<TomlConfig> for Config {
         Config::new(
             value.http_address,
             value.database_path,
-            value.sample_interval_secs,
             value.request_timeout_secs,
-            value.request_retries,
-            value.hn_front_page_len,
             value.user_agent,
         )
     }
@@ -159,10 +153,7 @@ mod tests {
         let expected = Config::new(
             "0.0.0.0:8080",
             "local_database.redb",
-            60,
             10,
-            2,
-            30,
             "wrongint/0.1 (+https://example.invalid)",
         )?;
         let loader = ConfigLoader::new(fixtures::test_file_path("local_config.toml"));

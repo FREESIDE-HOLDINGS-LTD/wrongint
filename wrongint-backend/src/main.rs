@@ -98,7 +98,7 @@ impl<'a> Service<'a> {
 
         let client = new_client(config.user_agent(), config.request_timeout_secs())?;
         let sources = Sources::new(
-            HackerNews::new(client.clone(), config.hn_front_page_len()),
+            HackerNews::new(client.clone()),
             Lobsters::new(client.clone()),
         );
 

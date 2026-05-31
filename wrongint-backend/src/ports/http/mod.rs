@@ -16,6 +16,33 @@ use tower_http::trace::TraceLayer;
 use utoipa::{IntoParams, OpenApi, ToSchema};
 use utoipa_redoc::{Redoc, Servable};
 
+#[cfg(feature = "embed-frontend")]
+mod frontend {
+    use axum::http::{Uri, header};
+    use axum::response::{IntoResponse, Response};
+    use rust_embed::RustEmbed;
+
+    #[derive(RustEmbed)]
+    #[folder = "../wrongint-frontend/dist"]
+    struct Assets;
+
+    // Serve the requested asset, falling back to index.html so client-side
+    // routes resolve (single-page app behaviour).
+    pub async fn serve(uri: Uri) -> Response {
+        let path = uri.path().trim_start_matches('/');
+        let path = if path.is_empty() { "index.html" } else { path };
+
+        if let Some(file) = Assets::get(path) {
+            let mime = mime_guess::from_path(path).first_or_octet_stream();
+            return ([(header::CONTENT_TYPE, mime.as_ref())], file.data).into_response();
+        }
+        match Assets::get("index.html") {
+            Some(index) => ([(header::CONTENT_TYPE, "text/html")], index.data).into_response(),
+            None => axum::http::StatusCode::NOT_FOUND.into_response(),
+        }
+    }
+}
+
 #[derive(OpenApi)]
 #[openapi(
     info(
@@ -91,6 +118,11 @@ where
             .layer(TraceLayer::new_for_http())
             .layer(cors)
             .with_state(self.state.clone());
+
+        // Serve the embedded single-page app for everything else (only when
+        // built with the `embed-frontend` feature).
+        #[cfg(feature = "embed-frontend")]
+        let router = router.fallback(frontend::serve);
 
         let listener = tokio::net::TcpListener::bind(self.config.http_address()).await?;
         axum::serve(listener, router).await?;

@@ -24,3 +24,11 @@ async-trait = "0.1"
 futures = "0.3"
 utoipa = { version = "5.5.0", features = ["axum_extras", "chrono", "yaml"] }
 utoipa-redoc = { version = "6.0.0", features = ["axum"] }
+rust-embed = { version = "8.7.2", optional = true }
+mime_guess = { version = "2.0.5", optional = true }
+
+[features]
+# Bundle the built frontend (wrongint-frontend/dist) into the binary and serve
+# it. Off by default so `cargo build` works without a frontend build present;
+# the Docker image turns it on.
+embed-frontend = ["dep:rust-embed", "dep:mime_guess"]

@@ -8,19 +8,17 @@ use serde::Deserialize;
 
 const TOP_STORIES_URL: &str = "https://hacker-news.firebaseio.com/v0/topstories.json";
 const ITEM_CONCURRENCY: usize = 10;
+// topstories.json returns ~500 ranked ids; we sample the top front page worth.
+const FRONT_PAGE_LEN: usize = 30;
 
 #[derive(Clone)]
 pub struct HackerNews {
     client: reqwest::Client,
-    front_page_len: usize,
 }
 
 impl HackerNews {
-    pub fn new(client: reqwest::Client, front_page_len: usize) -> Self {
-        Self {
-            client,
-            front_page_len,
-        }
+    pub fn new(client: reqwest::Client) -> Self {
+        Self { client }
     }
 
     fn item_url(id: i64) -> String {
@@ -37,7 +35,7 @@ impl HackerNews {
             .json()
             .await?;
 
-        let front: Vec<i64> = ids.into_iter().take(self.front_page_len).collect();
+        let front: Vec<i64> = ids.into_iter().take(FRONT_PAGE_LEN).collect();
 
         let items: Vec<Option<Post>> = futures::stream::iter(front)
             .map(|id| {
