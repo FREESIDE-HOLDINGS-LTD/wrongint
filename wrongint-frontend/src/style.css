@@ -408,8 +408,12 @@ h1 small {
 .contender-title {
   font-size: 14px;
   line-height: 1.3;
-  max-height: 2.6em;
+  /* Always reserve two lines so short and long titles yield equal height. */
+  height: 2.6em;
   overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .contender-title.muted {
