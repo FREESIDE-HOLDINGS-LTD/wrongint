@@ -1,10 +1,10 @@
 use crate::app;
-use crate::app::{GetIndexSeries, IndexSeries};
+use crate::app::{GetIndexSeries, IndexCandles, IndexScope};
 use crate::config::Config;
-use crate::domain::SourceId;
 use crate::domain::time::{DateTime, Duration};
+use crate::domain::{IndexCandle, SourceId};
 use crate::errors::Error;
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
@@ -20,11 +20,24 @@ use utoipa_redoc::{Redoc, Servable};
 #[openapi(
     info(
         title = "wrongint",
-        description = "Measures how argumentative programming communities are.",
-        version = "0.1.0"
+        version = "0.1.0",
+        description = "\
+wrongint measures how argumentative programming communities are. It samples the \
+front pages of Hacker News and lobste.rs, and for each snapshot computes an \
+**index** = pooled comments ÷ pooled score. A higher index means more comments \
+per upvote, i.e. more arguing.
+
+Indexes are aggregated into **hourly OHLC candles** (open / high / low / close \
+of the per-snapshot index within the hour), so the data reads like a stock \
+ticker. Query the **global** index (both sources pooled) or a single source.
+
+Timestamps are ISO-8601 / RFC-3339 in UTC. Ranges default to the last 7 days."
     ),
-    paths(handle_index),
-    components(schemas(ApiIndexSeries, ApiIndexPoint, ApiErrorBody))
+    tags(
+        (name = "index", description = "Hourly OHLC index candles."),
+    ),
+    paths(handle_index_global, handle_index_source),
+    components(schemas(ApiIndexCandles, ApiIndexCandle, ApiErrorBody))
 )]
 struct ApiDoc;
 
@@ -65,7 +78,8 @@ where
             .allow_headers(Any);
 
         let router = Router::new()
-            .route("/api/index", get(handle_index::<H>))
+            .route("/api/index", get(handle_index_global::<H>))
+            .route("/api/index/{source}", get(handle_index_source::<H>))
             .route("/metrics", get(handle_metrics::<H>))
             .route("/openapi.json", get(handle_openapi))
             .merge(Redoc::with_url("/docs", ApiDoc::openapi()))
@@ -82,28 +96,73 @@ where
 #[utoipa::path(
     get,
     path = "/api/index",
-    params(IndexParams),
+    tag = "index",
+    operation_id = "get_global_index",
+    summary = "Global index candles",
+    description = "Hourly OHLC candles for the global index — every Hacker News and lobste.rs \
+post in the window pooled together. Each candle's open/close are the first/last per-snapshot \
+index in that hour; high/low are the extremes. Hours with no usable data (pooled score <= 0) \
+are omitted. Candles are sorted oldest-first. Defaults to the last 7 days when from/to are absent.",
+    params(IndexRange),
     responses(
-        (status = 200, description = "Index series for a source", body = ApiIndexSeries),
-        (status = 400, description = "Invalid query parameters", body = ApiErrorBody),
-        (status = 500, description = "Internal server error", body = ApiErrorBody),
+        (status = 200, description = "Hourly OHLC candles for the global index", body = ApiIndexCandles),
+        (status = 400, description = "Malformed `from`/`to` timestamp, or `from` after `to`", body = ApiErrorBody),
+        (status = 500, description = "Unexpected server error", body = ApiErrorBody),
     )
 )]
-async fn handle_index<H>(
+async fn handle_index_global<H>(
     State(state): State<AppState<H>>,
-    Query(params): Query<IndexParams>,
-) -> std::result::Result<Json<ApiIndexSeries>, ApiError>
+    Query(range): Query<IndexRange>,
+) -> std::result::Result<Json<ApiIndexCandles>, ApiError>
 where
     H: app::GetIndexSeriesHandler,
 {
-    let source = parse_source(&params.source)?;
+    index(&state, IndexScope::Global, &range).await
+}
 
+#[utoipa::path(
+    get,
+    path = "/api/index/{source}",
+    tag = "index",
+    operation_id = "get_source_index",
+    summary = "Per-source index candles",
+    description = "Same as the global endpoint but scoped to a single community. `source` must be \
+`hackernews` or `lobsters`; anything else is a 400. Defaults to the last 7 days when from/to are absent.",
+    params(
+        ("source" = String, Path, description = "Community to query: `hackernews` or `lobsters`", example = "hackernews"),
+        IndexRange,
+    ),
+    responses(
+        (status = 200, description = "Hourly OHLC candles for one source", body = ApiIndexCandles),
+        (status = 400, description = "Unknown source, malformed timestamp, or `from` after `to`", body = ApiErrorBody),
+        (status = 500, description = "Unexpected server error", body = ApiErrorBody),
+    )
+)]
+async fn handle_index_source<H>(
+    State(state): State<AppState<H>>,
+    Path(source): Path<String>,
+    Query(range): Query<IndexRange>,
+) -> std::result::Result<Json<ApiIndexCandles>, ApiError>
+where
+    H: app::GetIndexSeriesHandler,
+{
+    index(&state, IndexScope::Source(parse_source(&source)?), &range).await
+}
+
+async fn index<H>(
+    state: &AppState<H>,
+    scope: IndexScope,
+    range: &IndexRange,
+) -> std::result::Result<Json<ApiIndexCandles>, ApiError>
+where
+    H: app::GetIndexSeriesHandler,
+{
     let now = DateTime::now();
-    let from = match &params.from {
+    let from = match &range.from {
         Some(s) => parse_ts(s)?,
         None => now - Duration::new_from_days(DEFAULT_RANGE_DAYS),
     };
-    let to = match &params.to {
+    let to = match &range.to {
         Some(s) => parse_ts(s)?,
         None => now,
     };
@@ -111,11 +170,11 @@ where
         return Err(ApiError::BadRequest("'from' must be <= 'to'".into()));
     }
 
-    let series = state
+    let candles = state
         .index_series
-        .handle(&GetIndexSeries::new(source, from, to))
+        .handle(&GetIndexSeries::new(scope, from, to))
         .await?;
-    Ok(Json(ApiIndexSeries::from(&series)))
+    Ok(Json(ApiIndexCandles::from(&candles)))
 }
 
 async fn handle_metrics<H>(
@@ -145,41 +204,56 @@ fn parse_ts(s: &str) -> Result<DateTime, ApiError> {
 
 #[derive(Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
-struct IndexParams {
-    /// Source identifier: `hackernews` or `lobsters`.
-    source: String,
-    /// Inclusive lower bound (ISO-8601). Defaults to 7 days ago.
+struct IndexRange {
+    #[param(example = "2026-05-24T00:00:00Z")]
     from: Option<String>,
-    /// Inclusive upper bound (ISO-8601). Defaults to now.
+    #[param(example = "2026-05-31T00:00:00Z")]
     to: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
-struct ApiIndexSeries {
+struct ApiIndexCandles {
+    #[schema(example = "all")]
     source: String,
-    points: Vec<ApiIndexPoint>,
+    candles: Vec<ApiIndexCandle>,
 }
 
-impl From<&IndexSeries> for ApiIndexSeries {
-    fn from(s: &IndexSeries) -> Self {
+impl From<&IndexCandles> for ApiIndexCandles {
+    fn from(s: &IndexCandles) -> Self {
         Self {
-            source: s.source().to_string(),
-            points: s.points().iter().map(ApiIndexPoint::from).collect(),
+            source: s.scope().to_string(),
+            candles: s
+                .over_time()
+                .candles()
+                .iter()
+                .map(ApiIndexCandle::from)
+                .collect(),
         }
     }
 }
 
 #[derive(Serialize, ToSchema)]
-struct ApiIndexPoint {
-    captured_at: String,
-    index: Option<f64>,
+struct ApiIndexCandle {
+    #[schema(example = "2026-05-31")]
+    date: String,
+    #[schema(example = 14)]
+    hour: u32,
+    open: Option<f64>,
+    high: Option<f64>,
+    low: Option<f64>,
+    close: Option<f64>,
 }
 
-impl From<&app::IndexPoint> for ApiIndexPoint {
-    fn from(p: &app::IndexPoint) -> Self {
+impl From<&IndexCandle> for ApiIndexCandle {
+    fn from(c: &IndexCandle) -> Self {
+        let ohlc = c.ohlc();
         Self {
-            captured_at: p.captured_at().to_rfc3339(),
-            index: p.index().map(|i| i.value()),
+            date: c.date().to_iso(),
+            hour: c.hour(),
+            open: ohlc.map(|o| o.open().value()),
+            high: ohlc.map(|o| o.high().value()),
+            low: ohlc.map(|o| o.low().value()),
+            close: ohlc.map(|o| o.close().value()),
         }
     }
 }
@@ -216,5 +290,6 @@ impl IntoResponse for ApiError {
 
 #[derive(Serialize, ToSchema)]
 struct ApiErrorBody {
+    #[schema(example = "unknown source 'bogus'")]
     error: String,
 }

@@ -6,10 +6,11 @@ use wrongint_backend::adapters::{ConfigLoader, Metrics, redb};
 use wrongint_backend::app::CaptureSnapshotsHandler as _;
 use wrongint_backend::app::capture_snapshots::CaptureSnapshotsHandler;
 use wrongint_backend::app::get_index_series::GetIndexSeriesHandler;
+use wrongint_backend::app::update_metrics::UpdateMetricsHandler;
 use wrongint_backend::config::Config;
 use wrongint_backend::errors::Result;
 use wrongint_backend::ports::http::{self, AppState};
-use wrongint_backend::ports::timers::CaptureSnapshotsTimer;
+use wrongint_backend::ports::timers::{CaptureSnapshotsTimer, UpdateMetricsTimer};
 
 fn cli() -> Command {
     Command::new("wrongint")
@@ -53,6 +54,7 @@ async fn run(config_path: &str, sample_now: bool) -> Result<()> {
 
     tokio::join!(
         service.capture_timer.run(),
+        service.update_metrics_timer.run(),
         http_server_loop(&service.http_server),
     );
     Ok(())
@@ -72,12 +74,15 @@ where
 
 type CaptureHandlerImpl = CaptureSnapshotsHandler<redb::Database, redb::Database, Sources, Metrics>;
 type GetIndexSeriesHandlerImpl = GetIndexSeriesHandler<redb::Database, Metrics>;
+type UpdateMetricsHandlerImpl = UpdateMetricsHandler<redb::Database, Metrics>;
 type CaptureTimerImpl = CaptureSnapshotsTimer<CaptureHandlerImpl>;
+type UpdateMetricsTimerImpl = UpdateMetricsTimer<UpdateMetricsHandlerImpl>;
 type HttpServerImpl<'a> = http::Server<'a, GetIndexSeriesHandlerImpl>;
 
 struct Service<'a> {
     http_server: HttpServerImpl<'a>,
     capture_timer: CaptureTimerImpl,
+    update_metrics_timer: UpdateMetricsTimerImpl,
     capture_handler: CaptureHandlerImpl,
 }
 
@@ -102,14 +107,17 @@ impl<'a> Service<'a> {
         );
         let get_index_series_handler =
             GetIndexSeriesHandler::new(database.clone(), metrics.clone());
+        let update_metrics_handler = UpdateMetricsHandler::new(database.clone(), metrics.clone());
 
         let capture_timer = CaptureSnapshotsTimer::new(capture_handler.clone());
+        let update_metrics_timer = UpdateMetricsTimer::new(update_metrics_handler);
         let state = AppState::new(get_index_series_handler, registry);
         let http_server = http::Server::new(config, state);
 
         Ok(Self {
             http_server,
             capture_timer,
+            update_metrics_timer,
             capture_handler,
         })
     }

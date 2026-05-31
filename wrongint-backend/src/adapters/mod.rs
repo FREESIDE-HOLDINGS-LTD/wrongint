@@ -2,10 +2,10 @@ pub mod redb;
 pub mod sources;
 
 use crate::app;
-use crate::app::ApplicationHandlerCallResult;
+use crate::app::{ApplicationHandlerCallResult, IndexScope};
 use crate::config::Config;
+use crate::domain::Index;
 use crate::domain::time::Duration;
-use crate::domain::{Index, SourceId};
 use crate::errors::Result;
 use prometheus::{CounterVec, GaugeVec, HistogramOpts, HistogramVec, Opts, Registry, labels};
 use serde::Deserialize;
@@ -138,13 +138,13 @@ impl app::Metrics for Metrics {
             .observe(duration.to_std().as_secs_f64());
     }
 
-    fn record_snapshot(&self, source: SourceId, index: Option<Index>, post_count: usize) {
-        let source = source.to_string();
+    fn record_index(&self, scope: IndexScope, index: Option<Index>, post_count: usize) {
+        let scope = scope.to_string();
         self.metric_index
-            .with(&labels! { "source" => source.as_str() })
+            .with(&labels! { "source" => scope.as_str() })
             .set(index.map(|i| i.value()).unwrap_or(f64::NAN));
         self.metric_posts_captured
-            .with(&labels! { "source" => source.as_str() })
+            .with(&labels! { "source" => scope.as_str() })
             .set(post_count as f64);
     }
 }

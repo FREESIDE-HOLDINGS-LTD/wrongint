@@ -1,4 +1,7 @@
+pub mod index;
 pub mod time;
+
+pub use index::{Index, IndexCandle, IndexOverTime, Ohlc};
 
 use crate::domain::time::{DateTime, Duration};
 use crate::errors::Result;
@@ -93,35 +96,6 @@ impl Snapshot {
 
     pub fn posts(&self) -> &[Post] {
         &self.posts
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Index {
-    value: f64,
-}
-
-impl Index {
-    pub fn from_snapshot(snapshot: &Snapshot) -> Option<Index> {
-        let mut comments = 0i64;
-        let mut score = 0i64;
-        for post in &snapshot.posts {
-            comments += post.comments.value();
-            score += match post.score {
-                PostScore::Points(points) => points.value(),
-                PostScore::UpvotesAndDownvotes(votes) => votes.net(),
-            };
-        }
-        if score <= 0 {
-            return None;
-        }
-        Some(Index {
-            value: comments as f64 / score as f64,
-        })
-    }
-
-    pub fn value(&self) -> f64 {
-        self.value
     }
 }
 

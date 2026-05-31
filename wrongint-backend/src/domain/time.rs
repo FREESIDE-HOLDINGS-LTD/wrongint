@@ -1,8 +1,25 @@
 use crate::errors::Result;
 use anyhow::anyhow;
-use chrono::DurationRound;
+use chrono::{DurationRound, Timelike};
 use std::fmt::Display;
 use std::ops::{Add, Sub};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Date {
+    d: chrono::NaiveDate,
+}
+
+impl Date {
+    pub fn to_iso(&self) -> String {
+        self.d.format("%Y-%m-%d").to_string()
+    }
+}
+
+impl Display for Date {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_iso())
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Eq, Ord, Hash)]
 pub struct DateTime {
@@ -37,9 +54,25 @@ impl DateTime {
         self.dt.timestamp()
     }
 
+    pub fn date(&self) -> Date {
+        Date {
+            d: self.dt.with_timezone(&chrono::Utc).date_naive(),
+        }
+    }
+
+    pub fn hour_of_day(&self) -> u32 {
+        self.dt.with_timezone(&chrono::Utc).hour()
+    }
+
     pub fn truncate_to_day(&self) -> Result<Self> {
         Ok(Self::new(
             self.dt.duration_trunc(chrono::Duration::days(1))?,
+        ))
+    }
+
+    pub fn truncate_to_hour(&self) -> Result<Self> {
+        Ok(Self::new(
+            self.dt.duration_trunc(chrono::Duration::hours(1))?,
         ))
     }
 

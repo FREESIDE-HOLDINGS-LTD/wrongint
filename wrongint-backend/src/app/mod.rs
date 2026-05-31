@@ -1,9 +1,9 @@
 pub mod capture_snapshots;
 pub mod get_index_series;
+pub mod update_metrics;
 
-use crate::domain;
 use crate::domain::time::{DateTime, Duration};
-use crate::domain::{Index, Snapshot, Source, SourceId};
+use crate::domain::{Index, IndexOverTime, Snapshot, Source, SourceId};
 use crate::errors::Result;
 use async_trait::async_trait;
 
@@ -14,22 +14,42 @@ pub trait CaptureSnapshotsHandler {
 
 #[async_trait]
 pub trait GetIndexSeriesHandler: Send + Sync {
-    async fn handle(&self, v: &GetIndexSeries) -> Result<IndexSeries>;
+    async fn handle(&self, v: &GetIndexSeries) -> Result<IndexCandles>;
+}
+
+#[async_trait]
+pub trait UpdateMetricsHandler {
+    async fn handle(&self) -> Result<()>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndexScope {
+    Global,
+    Source(SourceId),
+}
+
+impl std::fmt::Display for IndexScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IndexScope::Global => write!(f, "all"),
+            IndexScope::Source(id) => write!(f, "{id}"),
+        }
+    }
 }
 
 pub struct GetIndexSeries {
-    source: SourceId,
+    scope: IndexScope,
     from: DateTime,
     to: DateTime,
 }
 
 impl GetIndexSeries {
-    pub fn new(source: SourceId, from: DateTime, to: DateTime) -> Self {
-        Self { source, from, to }
+    pub fn new(scope: IndexScope, from: DateTime, to: DateTime) -> Self {
+        Self { scope, from, to }
     }
 
-    pub fn source(&self) -> SourceId {
-        self.source
+    pub fn scope(&self) -> IndexScope {
+        self.scope
     }
 
     pub fn from(&self) -> DateTime {
@@ -76,7 +96,7 @@ pub trait Metrics {
         duration: Duration,
     );
 
-    fn record_snapshot(&self, source: SourceId, index: Option<Index>, post_count: usize);
+    fn record_index(&self, scope: IndexScope, index: Option<Index>, post_count: usize);
 }
 
 pub enum ApplicationHandlerCallResult {
@@ -93,46 +113,22 @@ impl<T> From<&Result<T>> for ApplicationHandlerCallResult {
     }
 }
 
-pub struct IndexSeries {
-    source: SourceId,
-    points: Vec<IndexPoint>,
+pub struct IndexCandles {
+    scope: IndexScope,
+    over_time: IndexOverTime,
 }
 
-impl IndexSeries {
-    pub fn new(source: SourceId, points: Vec<IndexPoint>) -> Self {
-        Self { source, points }
+impl IndexCandles {
+    pub fn new(scope: IndexScope, over_time: IndexOverTime) -> Self {
+        Self { scope, over_time }
     }
 
-    pub fn source(&self) -> SourceId {
-        self.source
+    pub fn scope(&self) -> IndexScope {
+        self.scope
     }
 
-    pub fn points(&self) -> &[IndexPoint] {
-        &self.points
-    }
-}
-
-pub struct IndexPoint {
-    captured_at: DateTime,
-    index: Option<Index>,
-}
-
-impl IndexPoint {
-    pub fn captured_at(&self) -> DateTime {
-        self.captured_at
-    }
-
-    pub fn index(&self) -> Option<Index> {
-        self.index
-    }
-}
-
-impl From<&domain::Snapshot> for IndexPoint {
-    fn from(snapshot: &domain::Snapshot) -> Self {
-        Self {
-            captured_at: snapshot.captured_at(),
-            index: Index::from_snapshot(snapshot),
-        }
+    pub fn over_time(&self) -> &IndexOverTime {
+        &self.over_time
     }
 }
 
