@@ -1,5 +1,16 @@
 export type IndexSource = 'all' | 'hackernews' | 'lobsters'
 
+// Canonical display names for sources; used everywhere a source is shown.
+export const SOURCE_LABELS: Record<string, string> = {
+  all: 'GLOBAL',
+  hackernews: 'HACKER NEWS',
+  lobsters: 'LOBSTE.RS',
+}
+
+export function sourceLabel(source: string): string {
+  return SOURCE_LABELS[source] ?? source.toUpperCase()
+}
+
 export interface IndexCandle {
   date: string
   hour: number

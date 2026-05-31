@@ -2,6 +2,7 @@
 import { defineComponent, type PropType } from 'vue'
 import IndexChart from './IndexChart.vue'
 import type { IndexCandles, Post } from '../api'
+import { rangeOf, heat, accent, isHot, type Range } from '../heat'
 
 export default defineComponent({
   name: 'SourceSection',
@@ -22,6 +23,9 @@ export default defineComponent({
     leastContentious(): Post | null {
       return this.extreme((a, b) => a - b)
     },
+    range(): Range | null {
+      return rangeOf(this.rated.map((p) => p.index))
+    },
   },
   methods: {
     extreme(cmp: (a: number, b: number) => number): Post | null {
@@ -31,6 +35,12 @@ export default defineComponent({
     },
     fmt(v: number | null): string {
       return v == null ? '——' : v.toFixed(0)
+    },
+    accent(post: Post | null): string {
+      return accent(heat(post?.index, this.range))
+    },
+    hot(post: Post | null): boolean {
+      return isHot(heat(post?.index, this.range))
     },
   },
 })
@@ -49,7 +59,8 @@ export default defineComponent({
         ]"
         :key="item.label"
         class="contender"
-        :class="{ empty: !item.post }"
+        :class="{ empty: !item.post, hot: hot(item.post) }"
+        :style="{ '--accent': accent(item.post) }"
         :href="item.post?.comments_url"
         target="_blank"
         rel="noopener noreferrer"

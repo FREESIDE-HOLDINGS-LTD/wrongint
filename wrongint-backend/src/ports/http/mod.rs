@@ -19,7 +19,7 @@ use utoipa_redoc::{Redoc, Servable};
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "wrongint",
+        title = "FREESIDE OBSERVATION GROUP",
         version = "0.1.0",
         description = "\
 wrongint measures how argumentative programming communities are. It samples the \

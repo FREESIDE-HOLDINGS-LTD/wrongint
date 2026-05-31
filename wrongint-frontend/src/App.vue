@@ -4,7 +4,7 @@ import IndexChart from './components/IndexChart.vue'
 import Ticker, { type TickerItem } from './components/Ticker.vue'
 import PostsCarousel, { type CarouselPost } from './components/PostsCarousel.vue'
 import SourceSection from './components/SourceSection.vue'
-import { fetchIndexCandles, fetchSnapshot, type IndexCandles, type Post } from './api'
+import { fetchIndexCandles, fetchSnapshot, sourceLabel, type IndexCandles, type Post } from './api'
 
 const REFRESH_MS = 60_000
 
@@ -45,9 +45,9 @@ export default defineComponent({
   computed: {
     ticker(): TickerItem[] {
       return [
-        { label: 'GLOBAL', value: latestOf(this.global) },
-        { label: 'HACKERNEWS', value: latestOf(this.hackernews) },
-        { label: 'LOBSTERS', value: latestOf(this.lobsters) },
+        { label: sourceLabel('all'), value: latestOf(this.global) },
+        { label: sourceLabel('hackernews'), value: latestOf(this.hackernews) },
+        { label: sourceLabel('lobsters'), value: latestOf(this.lobsters) },
       ]
     },
   },
@@ -59,6 +59,7 @@ export default defineComponent({
     clearInterval(this.timer)
   },
   methods: {
+    sourceLabel,
     async load() {
       try {
         const [global, hackernews, lobsters, hnSnap, lobSnap] = await Promise.all([
@@ -97,8 +98,10 @@ export default defineComponent({
 
 <template>
   <div class="scanlines"></div>
-  <Ticker :items="ticker" />
-  <PostsCarousel :posts="posts" />
+  <header class="topbar">
+    <Ticker :items="ticker" />
+    <PostsCarousel :posts="posts" />
+  </header>
 
   <main>
     <h1>
@@ -109,9 +112,19 @@ export default defineComponent({
 
     <p v-if="error" class="error blink">!! {{ error }}</p>
 
-    <IndexChart title="GLOBAL" :candles="global" :height="340" color="#39ff14" />
+    <IndexChart :title="sourceLabel('all')" :candles="global" :height="340" color="#39ff14" />
 
-    <SourceSection title="HACKER NEWS" :candles="hackernews" :posts="hnPosts" color="#ff9f1c" />
-    <SourceSection title="LOBSTE.RS" :candles="lobsters" :posts="lobPosts" color="#b388ff" />
+    <SourceSection
+      :title="sourceLabel('hackernews')"
+      :candles="hackernews"
+      :posts="hnPosts"
+      color="#ff9f1c"
+    />
+    <SourceSection
+      :title="sourceLabel('lobsters')"
+      :candles="lobsters"
+      :posts="lobPosts"
+      color="#b388ff"
+    />
   </main>
 </template>
