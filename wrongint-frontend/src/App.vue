@@ -139,25 +139,33 @@ export default defineComponent({
   </header>
 
   <main>
-    <h1>
-      <span class="logo">FREESIDE GLOBAL OBSERVATION GROUP<span class="blink">_</span></span>
-      <small>WE ARE MONITORING THE SITUATION</small>
-    </h1>
+    <div class="wrap">
+      <h1>
+        <span class="logo">FREESIDE GLOBAL OBSERVATION GROUP<span class="blink">_</span></span>
+        <small>WE ARE MONITORING THE SITUATION</small>
+      </h1>
 
-    <p v-if="error" class="error blink">!! {{ error }}</p>
+      <p v-if="error" class="error blink">!! {{ error }}</p>
 
-    <div class="global-hero">
-      <span class="global-hero-num" :class="{ blink: globalDir > 0 }" :style="{ color: globalColor }">
-        {{ globalValue == null ? '——' : globalValue.toFixed(0) }}
-        <span v-if="globalDir !== 0" class="global-hero-arrow">{{ globalDir > 0 ? '▲' : '▼' }}</span>
-      </span>
-      <span class="global-hero-label">GLOBAL INTERNET DRAMA INDEX</span>
-      <span class="global-hero-sym">{{ globalSymbol }}</span>
+      <div class="global-hero">
+        <span
+          class="global-hero-num"
+          :class="{ blink: globalDir > 0 }"
+          :style="{ color: globalColor }"
+        >
+          {{ globalValue == null ? '——' : globalValue.toFixed(0) }}
+          <span v-if="globalDir !== 0" class="global-hero-arrow">{{
+            globalDir > 0 ? '▲' : '▼'
+          }}</span>
+        </span>
+        <span class="global-hero-label">GLOBAL INTERNET DRAMA INDEX</span>
+        <span class="global-hero-sym">{{ globalSymbol }}</span>
+      </div>
+
+      <IndexChart source="all" :candles="global" :height="340" :head="false" />
+
+      <SourceSection source="hackernews" :candles="hackernews" :posts="hnPosts" />
+      <SourceSection source="lobsters" :candles="lobsters" :posts="lobPosts" />
     </div>
-
-    <IndexChart source="all" :candles="global" :height="340" :head="false" />
-
-    <SourceSection source="hackernews" :candles="hackernews" :posts="hnPosts" />
-    <SourceSection source="lobsters" :candles="lobsters" :posts="lobPosts" />
   </main>
 </template>

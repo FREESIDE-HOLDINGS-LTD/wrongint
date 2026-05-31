@@ -11,6 +11,16 @@ import {
 } from '../api'
 import { rangeOf, heat, accent, isHot, type Range } from '../heat'
 
+// Posts shown per side of the clash (champion + follow-up challengers).
+const SIDE_SIZE = 3
+
+export interface Contender {
+  post: Post
+  champion: boolean
+  // 0 at the center (the clash), growing outward — used to fade the ranks.
+  rank: number
+}
+
 // Last two non-null closes, newest first.
 function recentCloses(candles: IndexCandles | null): number[] {
   const list = candles?.candles ?? []
@@ -57,22 +67,49 @@ export default defineComponent({
     rated(): Post[] {
       return this.posts.filter((p) => p.index != null)
     },
-    mostContentious(): Post | null {
-      return this.extreme((a, b) => b - a)
+    // Hottest first.
+    byHeat(): Post[] {
+      return [...this.rated].sort((a, b) => (b.index as number) - (a.index as number))
     },
-    leastContentious(): Post | null {
-      return this.extreme((a, b) => a - b)
+    // How many to take per side without the two sides overlapping.
+    take(): number {
+      return Math.min(SIDE_SIZE, Math.floor(this.byHeat.length / 2))
+    },
+    // WIRED team. Ordered left -> center: weakest challenger first, champion
+    // (most contentious) last so it sits against the clash in the middle.
+    wired(): Contender[] {
+      const top = this.byHeat.slice(0, this.take) // hottest first
+      return top
+        .map((post, i) => ({ post, champion: i === 0, rank: i }))
+        .reverse()
+    },
+    // TIRED team. Ordered center -> right: champion (calmest) first, against
+    // the clash; weaker challengers trail off to the right.
+    tired(): Contender[] {
+      const n = this.byHeat.length
+      const bottom = this.byHeat.slice(n - this.take) // ...coolest last
+      return bottom
+        .map((post, i) => ({ post, champion: i === bottom.length - 1, rank: i }))
+        .reverse() // coolest (champion) first
+        .map((c, i) => ({ ...c, rank: i }))
+    },
+    wiredChampion(): Contender | null {
+      return this.wired.find((c) => c.champion) ?? null
+    },
+    wiredChallengers(): Contender[] {
+      return this.wired.filter((c) => !c.champion)
+    },
+    tiredChampion(): Contender | null {
+      return this.tired.find((c) => c.champion) ?? null
+    },
+    tiredChallengers(): Contender[] {
+      return this.tired.filter((c) => !c.champion)
     },
     range(): Range | null {
       return rangeOf(this.rated.map((p) => p.index))
     },
   },
   methods: {
-    extreme(cmp: (a: number, b: number) => number): Post | null {
-      const list = [...this.rated]
-      list.sort((a, b) => cmp(a.index as number, b.index as number))
-      return list[0] ?? null
-    },
     fmt(v: number | null): string {
       return v == null ? '——' : v.toFixed(0)
     },
@@ -81,6 +118,10 @@ export default defineComponent({
     },
     hot(post: Post | null): boolean {
       return isHot(heat(post?.index, this.range))
+    },
+    // Challengers further from the clash are dimmer.
+    dim(rank: number): number {
+      return Math.max(0.45, 1 - rank * 0.22)
     },
   },
 })
@@ -108,32 +149,109 @@ export default defineComponent({
       </span>
     </h2>
     <div class="contention">
-      <a
-        v-for="item in [
-          { emoji: '😡', label: 'WIRED', post: mostContentious },
-          { emoji: '😴', label: 'TIRED', post: leastContentious },
-        ]"
-        :key="item.label"
-        class="contender"
-        :class="{ empty: !item.post, hot: hot(item.post) }"
-        :style="{ '--accent': accent(item.post) }"
-        :href="item.post?.comments_url"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <span class="contender-emoji">{{ item.emoji }}</span>
-        <span class="contender-body">
-          <span class="contender-label">{{ item.label }}</span>
-          <span v-if="item.post" class="contender-title">{{ item.post.title }}</span>
-          <span v-else class="contender-title muted">no data</span>
-          <span v-if="item.post" class="contender-meta">
-            <span class="contender-idx">idx {{ fmt(item.post.index) }}</span>
-            <span class="contender-cs"
-              >{{ item.post.comments }} comments / {{ item.post.score }} points</span
+      <!-- WIRED team: challengers fill the outer margin, champion pinned to the
+           chart edge (inner) so its outer edge lines up with the chart. -->
+      <div class="team team--wired">
+        <div class="ranks ranks--wired">
+          <template v-for="(c, i) in wiredChallengers" :key="c.post.id">
+            <a
+              class="contender"
+              :class="{ hot: hot(c.post) }"
+              :style="{ '--accent': accent(c.post), opacity: dim(c.rank) }"
+              :href="c.post.comments_url"
+              target="_blank"
+              rel="noopener noreferrer"
             >
+              <span class="contender-body">
+                <span class="contender-title">{{ c.post.title }}</span>
+                <span class="contender-meta">
+                  <span class="contender-idx">idx {{ fmt(c.post.index) }}</span>
+                  <span class="contender-cs">{{ c.post.comments }} comments / {{ c.post.score }} points</span>
+                </span>
+              </span>
+            </a>
+            <span v-if="i < wiredChallengers.length - 1" class="advance advance--right" aria-hidden="true">➤</span>
+          </template>
+          <span v-if="wiredChallengers.length" class="advance advance--right" aria-hidden="true">➤</span>
+        </div>
+        <a
+          v-if="wiredChampion"
+          class="contender champion"
+          :class="{ hot: hot(wiredChampion.post) }"
+          :style="{ '--accent': accent(wiredChampion.post) }"
+          :href="wiredChampion.post.comments_url"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span class="contender-emoji">😡</span>
+          <span class="contender-body">
+            <span class="contender-label">WIRED</span>
+            <span class="contender-title">{{ wiredChampion.post.title }}</span>
+            <span class="contender-meta">
+              <span class="contender-idx">idx {{ fmt(wiredChampion.post.index) }}</span>
+              <span class="contender-cs">{{ wiredChampion.post.comments }} comments / {{ wiredChampion.post.score }} points</span>
+            </span>
           </span>
-        </span>
-      </a>
+        </a>
+      </div>
+
+      <!-- The clash: the two champions meeting in the middle, lightning
+           arcing between them, sparks flying. -->
+      <div v-if="wired.length && tired.length" class="clash" aria-hidden="true">
+        <span class="spark spark--1">✦</span>
+        <span class="spark spark--2">✧</span>
+        <span class="spark spark--3">✦</span>
+        <span class="spark spark--4">✧</span>
+        <span class="bolt bolt--1">⚡</span>
+        <span class="bolt bolt--2">⚡</span>
+        <span class="clash-core">⚡</span>
+      </div>
+
+      <!-- TIRED team: champion pinned to chart edge (inner), challengers trail
+           out to the page edge. -->
+      <div class="team team--tired">
+        <a
+          v-if="tiredChampion"
+          class="contender champion"
+          :class="{ hot: hot(tiredChampion.post) }"
+          :style="{ '--accent': accent(tiredChampion.post) }"
+          :href="tiredChampion.post.comments_url"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span class="contender-emoji">😴</span>
+          <span class="contender-body">
+            <span class="contender-label">TIRED</span>
+            <span class="contender-title">{{ tiredChampion.post.title }}</span>
+            <span class="contender-meta">
+              <span class="contender-idx">idx {{ fmt(tiredChampion.post.index) }}</span>
+              <span class="contender-cs">{{ tiredChampion.post.comments }} comments / {{ tiredChampion.post.score }} points</span>
+            </span>
+          </span>
+        </a>
+        <div class="ranks ranks--tired">
+          <span v-if="tiredChallengers.length" class="advance advance--left" aria-hidden="true">➤</span>
+          <template v-for="(c, i) in tiredChallengers" :key="c.post.id">
+            <a
+              class="contender"
+              :class="{ hot: hot(c.post) }"
+              :style="{ '--accent': accent(c.post), opacity: dim(c.rank) }"
+              :href="c.post.comments_url"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span class="contender-body">
+                <span class="contender-title">{{ c.post.title }}</span>
+                <span class="contender-meta">
+                  <span class="contender-idx">idx {{ fmt(c.post.index) }}</span>
+                  <span class="contender-cs">{{ c.post.comments }} comments / {{ c.post.score }} points</span>
+                </span>
+              </span>
+            </a>
+            <span v-if="i < tiredChallengers.length - 1" class="advance advance--left" aria-hidden="true">➤</span>
+          </template>
+        </div>
+      </div>
     </div>
     <IndexChart :source="source" :candles="candles" :height="320" :head="false" />
   </section>

@@ -182,9 +182,18 @@ body {
 
 /* ---- Layout ---- */
 main {
-  max-width: 1100px;
+  /* Unconstrained: full-width children (the battle line) spread to the page
+     edges. Reading content is wrapped in .wrap to stay in a centred column. */
   margin: 0 auto;
   padding: 22px 16px 60px;
+}
+
+/* Constraint wrapper: wrap anything that should stay in the centred reading
+   column. Full-width pieces (.contention) are left outside it. Its own
+   container context so .logo's cqw sizing resolves against this width. */
+.wrap {
+  max-width: 1280px;
+  margin: 0 auto;
   container-type: inline-size;
 }
 
@@ -247,7 +256,7 @@ h1 small {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  margin: 28px 0 20px;
+  margin: 28px auto 20px;
 }
 
 .global-hero-label {
@@ -392,18 +401,61 @@ a.section-head-name:hover {
   font-size: 0.65em;
 }
 
+/* ---- Contention: a battle line. The most WIRED and most TIRED posts march
+   toward the centre and clash; challengers queue up behind each champion,
+   arrows pointing toward the fight, ranks fading out toward the edges. ---- */
 .contention {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  /* Card / column widths. The two champions are wide: together they span the
+     chart width, each filling half of it minus a small central lightning gap
+     (--arena), so their outer edges land on the chart's left/right edges.
+     Smaller challenger cards fill the outer page margins out to the edges. */
+  --chart: min(1280px, 100vw - 32px);
+  --arena: 64px;
+  --champ: calc((var(--chart) - var(--arena)) / 2);
+  --card: 200px;
+
+  display: flex;
+  align-items: stretch;
+  gap: 0;
   margin-top: 12px;
+  /* Full-bleed: break out of .wrap so challengers can reach the page edges
+     while the champions stay pinned to the (capped) chart edges. */
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  overflow: hidden;
+}
+
+.team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Challengers live here, filling the outer page margin. flex:1 absorbs the
+   variable margin width so the champion (fixed) always pins to the chart edge. */
+.ranks {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Challengers stretch to share the outer margin instead of staying narrow. */
+.ranks .contender {
+  flex: 1 1 0;
 }
 
 .contender {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 0 var(--card);
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, #1f262d);
   border-radius: 8px;
@@ -417,10 +469,21 @@ a.section-head-name:hover {
   animation: card-pulse 0.9s steps(1) infinite;
 }
 
+/* Champions are the ones actually fighting: wide (half the chart), pinned to
+   the chart edge, brighter, emoji + text side by side. */
+.contender.champion {
+  flex: 0 0 var(--champ);
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  border-color: var(--accent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
 .contender-emoji {
-  font-size: 40px;
+  font-size: 56px;
   line-height: 1;
-  flex-shrink: 0;
+  flex: none;
 }
 
 .contender-body {
@@ -428,26 +491,24 @@ a.section-head-name:hover {
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 0;
 }
 
 .contender:hover {
   border-color: var(--accent);
 }
 
-.contender.empty {
-  pointer-events: none;
-}
-
 .contender-label {
   font-size: 10px;
   letter-spacing: 1px;
-  color: var(--muted);
+  color: var(--accent);
+  font-weight: 700;
   text-transform: uppercase;
+  text-shadow: 0 0 6px var(--accent);
 }
 
 .contender-title {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.3;
   /* Always reserve two lines so short and long titles yield equal height. */
   height: 2.6em;
@@ -457,13 +518,11 @@ a.section-head-name:hover {
   -webkit-line-clamp: 2;
 }
 
-.contender-title.muted {
-  color: var(--muted);
-}
-
 .contender-meta {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: 4px 10px;
   font-size: 11px;
 }
 
@@ -475,11 +534,185 @@ a.section-head-name:hover {
 
 .contender-cs {
   color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Arrows: challengers trying to advance toward the clash. */
+.advance {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 26px;
+  font-weight: 700;
+  color: #eafaff;
+  text-shadow: 0 0 12px #7fd2ff, 0 0 6px #7fd2ff, 0 0 2px #ffffff;
+  opacity: 1;
+  animation: advance-pulse 1.2s ease-in-out infinite;
+}
+
+.advance--left {
+  transform: scaleX(-1);
+}
+
+@keyframes advance-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(3px);
+  }
+}
+
+.advance--left {
+  animation-name: advance-pulse-left;
+}
+
+@keyframes advance-pulse-left {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scaleX(-1) translateX(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(-1) translateX(3px);
+  }
+}
+
+/* The clash arena: spans the gap between the champions (which sit on the chart
+   edges), lightning arcing across it. */
+.clash {
+  position: relative;
+  flex: 0 0 var(--arena);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clash-core {
+  font-size: 26px;
+  color: #fff3b0;
+  text-shadow:
+    0 0 8px var(--neon),
+    0 0 16px var(--hot);
+  animation: clash-flare 0.5s steps(2) infinite;
+}
+
+@keyframes clash-flare {
+  0% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.4) rotate(-12deg);
+    filter: brightness(2.2);
+  }
+}
+
+/* Lightning bolts arcing between the two champions. */
+.bolt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 20px;
+  color: #cfe9ff;
+  text-shadow:
+    0 0 6px #7fd2ff,
+    0 0 14px var(--neon);
+  opacity: 0;
+  animation: bolt-arc 0.45s steps(2) infinite;
+}
+
+.bolt--1 {
+  transform: translate(-50%, -50%) rotate(-18deg);
+  animation-delay: 0.05s;
+}
+
+.bolt--2 {
+  transform: translate(-50%, -50%) rotate(16deg) scaleX(-1);
+  animation-delay: 0.28s;
+  font-size: 16px;
+}
+
+@keyframes bolt-arc {
+  0%,
+  60% {
+    opacity: 0;
+  }
+  61%,
+  100% {
+    opacity: 1;
+  }
+}
+
+.spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 12px;
+  color: #ffd166;
+  text-shadow: 0 0 6px var(--hot);
+  opacity: 0;
+  animation: spark-fly 0.7s ease-out infinite;
+}
+
+.spark--1 {
+  animation-delay: 0s;
+  --sx: -16px;
+  --sy: -14px;
+}
+.spark--2 {
+  animation-delay: 0.15s;
+  --sx: 16px;
+  --sy: -12px;
+}
+.spark--3 {
+  animation-delay: 0.32s;
+  --sx: -14px;
+  --sy: 14px;
+}
+.spark--4 {
+  animation-delay: 0.5s;
+  --sx: 15px;
+  --sy: 13px;
+}
+
+@keyframes spark-fly {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--sx)), calc(-50% + var(--sy))) scale(1);
+  }
 }
 
 @media (max-width: 720px) {
-  .contention {
-    grid-template-columns: 1fr;
+  .contender {
+    flex: 0 0 150px;
+  }
+  .contender.champion {
+    flex: 0 0 var(--champ);
+  }
+  .contender-emoji {
+    font-size: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .advance,
+  .clash-core,
+  .spark,
+  .bolt {
+    animation: none;
+  }
+  .spark,
+  .bolt {
+    opacity: 0.6;
   }
 }
 
