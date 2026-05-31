@@ -35,3 +35,12 @@ export function accent(t: number | null): string {
 export function isHot(t: number | null): boolean {
   return t != null && t >= 0.66
 }
+
+// Face graded the same way as the color: sleepy (cool) through angry (hot).
+// Neutral face when there is no heat.
+export const FACES = ['😴', '🥱', '😑', '😐', '😤', '😠', '😡']
+export function emoji(t: number | null): string {
+  if (t == null) return '😶'
+  const i = Math.min(FACES.length - 1, Math.floor(t * FACES.length))
+  return FACES[i]
+}

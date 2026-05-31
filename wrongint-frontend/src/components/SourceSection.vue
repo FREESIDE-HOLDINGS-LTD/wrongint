@@ -10,7 +10,7 @@ import {
   type IndexCandles,
   type Post,
 } from '../api'
-import { rangeOf, heat, accent, isHot, type Range } from '../heat'
+import { rangeOf, heat, accent, isHot, emoji, type Range } from '../heat'
 
 // Posts shown per side of the clash (champion + follow-up challengers).
 const SIDE_SIZE = 3
@@ -120,6 +120,9 @@ export default defineComponent({
     hot(post: Post | null): boolean {
       return isHot(heat(post?.index, this.range))
     },
+    emoji(post: Post | null): string {
+      return emoji(heat(post?.index, this.range))
+    },
     // Challengers further from the clash are dimmer.
     dim(rank: number): number {
       return Math.max(0.45, 1 - rank * 0.22)
@@ -163,6 +166,7 @@ export default defineComponent({
               target="_blank"
               rel="noopener noreferrer"
             >
+              <span class="contender-emoji contender-emoji--sm" aria-hidden="true">{{ emoji(c.post) }}</span>
               <span class="contender-body">
                 <span class="contender-title">{{ c.post.title }}</span>
                 <span class="contender-meta">
@@ -184,7 +188,7 @@ export default defineComponent({
           target="_blank"
           rel="noopener noreferrer"
         >
-          <span class="contender-emoji">😡</span>
+          <span class="contender-emoji" aria-hidden="true">{{ emoji(wiredChampion.post) }}</span>
           <span class="contender-body">
             <span class="contender-label">WIRED</span>
             <span class="contender-title">{{ wiredChampion.post.title }}</span>
@@ -220,7 +224,7 @@ export default defineComponent({
           target="_blank"
           rel="noopener noreferrer"
         >
-          <span class="contender-emoji">😴</span>
+          <span class="contender-emoji" aria-hidden="true">{{ emoji(tiredChampion.post) }}</span>
           <span class="contender-body">
             <span class="contender-label">TIRED</span>
             <span class="contender-title">{{ tiredChampion.post.title }}</span>
@@ -241,6 +245,7 @@ export default defineComponent({
               target="_blank"
               rel="noopener noreferrer"
             >
+              <span class="contender-emoji contender-emoji--sm" aria-hidden="true">{{ emoji(c.post) }}</span>
               <span class="contender-body">
                 <span class="contender-title">{{ c.post.title }}</span>
                 <span class="contender-meta">

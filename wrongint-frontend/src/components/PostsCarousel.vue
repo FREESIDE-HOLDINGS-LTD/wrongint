@@ -2,7 +2,7 @@
 import { defineComponent, type PropType } from 'vue'
 import { Vue3Marquee } from 'vue3-marquee'
 import { sourceLabel, type Post } from '../api'
-import { rangeOf, heat, accent, isHot, type Range } from '../heat'
+import { rangeOf, heat, accent, isHot, emoji, type Range } from '../heat'
 
 export interface CarouselPost extends Post {
   source: string
@@ -35,6 +35,9 @@ export default defineComponent({
     hot(p: CarouselPost): boolean {
       return isHot(heat(p.index, this.ranges[p.source] ?? null))
     },
+    emoji(p: CarouselPost): string {
+      return emoji(heat(p.index, this.ranges[p.source] ?? null))
+    },
   },
 })
 </script>
@@ -43,7 +46,7 @@ export default defineComponent({
   <Vue3Marquee
     v-if="posts.length"
     class="carousel"
-    :duration="95"
+    :duration="120"
     :clone="true"
     :pause-on-hover="true"
   >
@@ -57,11 +60,14 @@ export default defineComponent({
       target="_blank"
       rel="noopener noreferrer"
     >
-      <span class="card-src">{{ sourceLabel(p.source) }}</span>
-      <span class="card-title">{{ p.title }}</span>
-      <span class="card-meta">
-        <span class="card-idx">idx {{ fmt(p.index) }}</span>
-        <span class="card-cs">{{ p.comments }} comments / {{ p.score }} points</span>
+      <span class="card-emoji" aria-hidden="true">{{ emoji(p) }}</span>
+      <span class="card-body">
+        <span class="card-src">{{ sourceLabel(p.source) }}</span>
+        <span class="card-title">{{ p.title }}</span>
+        <span class="card-meta">
+          <span class="card-idx">idx {{ fmt(p.index) }}</span>
+          <span class="card-cs">{{ p.comments }} comments / {{ p.score }} points</span>
+        </span>
       </span>
     </a>
   </Vue3Marquee>

@@ -112,10 +112,10 @@ body {
 
 .card {
   margin: 0 6px;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 4px;
-  width: 300px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 420px;
   height: 92px;
   white-space: normal;
   padding: 8px 10px;
@@ -125,6 +125,20 @@ body {
   text-decoration: none;
   color: var(--text);
   overflow: hidden;
+}
+
+.card-emoji {
+  font-size: 46px;
+  line-height: 1;
+  flex: none;
+}
+
+.card-body {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 0;
 }
 
 .card {
@@ -284,6 +298,26 @@ h1 small {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 3px;
+}
+
+.heat-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 8px 0 24px;
+}
+
+.heat-legend-face {
+  font-size: 40px;
+  line-height: 1;
+  text-shadow: 0 0 10px currentColor;
+}
+
+.heat-legend-end {
+  font-size: 13px;
+  letter-spacing: 3px;
+  color: var(--muted);
 }
 
 .chart-head {
@@ -513,6 +547,17 @@ a.section-head-name:hover {
   font-size: 56px;
   line-height: 1;
   flex: none;
+}
+
+/* Challengers: emoji sits inline to the left of the body, scaled down. */
+.contender:not(.champion) {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.contender-emoji--sm {
+  font-size: 40px;
 }
 
 .contender-body {
