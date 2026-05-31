@@ -11,11 +11,6 @@ export default defineComponent({
   props: {
     posts: { type: Array as PropType<CarouselPost[]>, default: () => [] },
   },
-  computed: {
-    loop(): CarouselPost[] {
-      return this.posts.length > 0 ? [...this.posts, ...this.posts] : []
-    },
-  },
   methods: {
     fmt(v: number | null): string {
       return v == null ? '——' : v.toFixed(3)
@@ -43,23 +38,25 @@ export default defineComponent({
 </script>
 
 <template>
-  <div class="carousel" @mouseenter="ramp(0.12)" @mouseleave="ramp(1)">
+  <div v-if="posts.length" class="carousel" @mouseenter="ramp(0.12)" @mouseleave="ramp(1)">
     <div ref="track" class="carousel-track">
-      <a
-        v-for="(p, i) in loop"
-        :key="i"
-        class="card"
-        :href="p.comments_url"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <span class="card-src">{{ p.source }}</span>
-        <span class="card-title">{{ p.title }}</span>
-        <span class="card-meta">
-          <span class="card-idx">idx {{ fmt(p.index) }}</span>
-          <span class="card-cs">{{ p.comments }}c / {{ p.score }}p</span>
-        </span>
-      </a>
+      <div v-for="g in 2" :key="g" class="carousel-group">
+        <a
+          v-for="(p, i) in posts"
+          :key="i"
+          class="card"
+          :href="p.comments_url"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span class="card-src">{{ p.source }}</span>
+          <span class="card-title">{{ p.title }}</span>
+          <span class="card-meta">
+            <span class="card-idx">idx {{ fmt(p.index) }}</span>
+            <span class="card-cs">{{ p.comments }}c / {{ p.score }}p</span>
+          </span>
+        </a>
+      </div>
     </div>
   </div>
 </template>

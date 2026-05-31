@@ -94,6 +94,7 @@ export default defineComponent({
 <template>
   <div class="scanlines"></div>
   <Ticker :items="ticker" />
+  <PostsCarousel :posts="posts" />
 
   <main>
     <h1>
@@ -103,8 +104,6 @@ export default defineComponent({
     </h1>
 
     <p v-if="error" class="error blink">!! {{ error }}</p>
-
-    <PostsCarousel :posts="posts" />
 
     <IndexChart title="GLOBAL" :candles="global" :height="340" color="#39ff14" />
 

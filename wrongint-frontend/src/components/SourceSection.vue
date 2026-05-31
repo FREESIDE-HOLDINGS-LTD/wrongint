@@ -38,7 +38,9 @@ export default defineComponent({
 
 <template>
   <section class="source-section">
-    <IndexChart :title="title" :candles="candles" :color="color" :height="320" />
+    <h2 class="section-head" :style="{ color, borderColor: color }">
+      <span class="section-head-mark">▌</span>{{ title }}
+    </h2>
     <div class="contention">
       <a
         v-for="item in [
@@ -64,5 +66,6 @@ export default defineComponent({
         </span>
       </a>
     </div>
+    <IndexChart :title="title" :candles="candles" :color="color" :height="320" />
   </section>
 </template>

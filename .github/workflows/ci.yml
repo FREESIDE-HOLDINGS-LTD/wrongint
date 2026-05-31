@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  check-backend:
+    name: Check backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wrongint-backend
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: wrongint-backend
+
+      - name: Run CI
+        run: make ci
+
+  check-frontend:
+    name: Check frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wrongint-frontend
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Run CI
+        run: make ci
