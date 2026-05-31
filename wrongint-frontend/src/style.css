@@ -692,11 +692,22 @@ a.section-head-name:hover {
 }
 
 @media (max-width: 720px) {
-  .contender {
-    flex: 0 0 150px;
+  /* No room for the full battle line. Drop the challenger ranks and stack the
+     two champions one below the other, the clash arena between them. */
+  .contention {
+    flex-direction: column;
+    /* Full-bleed strip spans 100vw; pad so champions don't touch the edges. */
+    padding: 0 16px;
+  }
+  .ranks {
+    display: none;
+  }
+  .team {
+    width: 100%;
   }
   .contender.champion {
-    flex: 0 0 var(--champ);
+    flex: 1 1 auto;
+    width: 100%;
   }
   .contender-emoji {
     font-size: 40px;
