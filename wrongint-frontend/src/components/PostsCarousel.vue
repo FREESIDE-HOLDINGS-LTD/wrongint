@@ -49,7 +49,7 @@ export default defineComponent({
         v-for="(p, i) in loop"
         :key="i"
         class="card"
-        :href="p.url"
+        :href="p.comments_url"
         target="_blank"
         rel="noopener noreferrer"
       >

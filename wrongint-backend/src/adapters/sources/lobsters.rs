@@ -1,6 +1,6 @@
 use crate::domain::time::DateTime;
 use crate::domain::{
-    Post, PostComments, PostId, PostScore, PostTitle, PostUrl, SourceId, UpvotesAndDownvotes,
+    ExternalUrl, Post, PostComments, PostId, PostScore, PostTitle, SourceId, UpvotesAndDownvotes,
 };
 use crate::errors::Result;
 use serde::Deserialize;
@@ -63,11 +63,12 @@ impl LobstersItem {
             Some(s) => DateTime::new_from_rfc3339(s).ok()?,
             None => DateTime::now(),
         };
+        let external_url = ExternalUrl::new(self.url).ok();
         Some(Post::new(
             SourceId::Lobsters,
             PostId::new(self.short_id).ok()?,
             PostTitle::new(self.title).ok()?,
-            PostUrl::new(self.url).ok()?,
+            external_url,
             posted_at,
             PostComments::new(self.comment_count).ok()?,
             PostScore::UpvotesAndDownvotes(votes.ok()?),

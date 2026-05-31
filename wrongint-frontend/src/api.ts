@@ -18,7 +18,8 @@ export interface IndexCandles {
 export interface Post {
   id: string
   title: string
-  url: string
+  comments_url: string
+  external_url: string | null
   posted_at: string
   comments: number
   score: number

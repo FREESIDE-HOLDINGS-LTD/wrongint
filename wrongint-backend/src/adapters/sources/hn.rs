@@ -1,5 +1,7 @@
 use crate::domain::time::DateTime;
-use crate::domain::{Points, Post, PostComments, PostId, PostScore, PostTitle, PostUrl, SourceId};
+use crate::domain::{
+    ExternalUrl, Points, Post, PostComments, PostId, PostScore, PostTitle, SourceId,
+};
 use crate::errors::Result;
 use futures::stream::StreamExt;
 use serde::Deserialize;
@@ -23,10 +25,6 @@ impl HackerNews {
 
     fn item_url(id: i64) -> String {
         format!("https://hacker-news.firebaseio.com/v0/item/{id}.json")
-    }
-
-    fn permalink(id: i64) -> String {
-        format!("https://news.ycombinator.com/item?id={id}")
     }
 
     pub async fn fetch(&self) -> Result<Vec<Post>> {
@@ -93,12 +91,12 @@ impl HnItem {
         if self.kind.as_deref() != Some("story") {
             return None;
         }
-        let url = self.url.unwrap_or_else(|| HackerNews::permalink(self.id));
+        let external_url = self.url.and_then(|u| ExternalUrl::new(u).ok());
         Some(Post::new(
             SourceId::HackerNews,
             PostId::new(self.id.to_string()).ok()?,
             PostTitle::new(self.title).ok()?,
-            PostUrl::new(url).ok()?,
+            external_url,
             DateTime::new_from_unix_timestamp(self.time).ok()?,
             PostComments::new(self.descendants).ok()?,
             PostScore::Points(Points::new(self.score).ok()?),
@@ -119,19 +117,27 @@ mod tests {
         assert_eq!(post.post_id().as_str(), "1");
         assert_eq!(post.score(), PostScore::Points(Points::new(100)?));
         assert_eq!(post.comments().value(), 42);
-        assert_eq!(post.url().as_str(), "https://example.com");
+        assert_eq!(
+            post.comments_url().as_str(),
+            "https://news.ycombinator.com/item?id=1"
+        );
+        assert_eq!(
+            post.external_url().map(|u| u.as_str()),
+            Some("https://example.com")
+        );
         Ok(())
     }
 
     #[test]
-    fn self_post_uses_permalink() -> Result<()> {
+    fn self_post_has_no_external_url() -> Result<()> {
         let json = r#"{"id":7,"type":"story","score":5,"descendants":0,"title":"ask"}"#;
         let item: HnItem = serde_json::from_str(json)?;
         let post = item.into_post().expect("should map to a post");
         assert_eq!(
-            post.url().as_str(),
+            post.comments_url().as_str(),
             "https://news.ycombinator.com/item?id=7"
         );
+        assert_eq!(post.external_url(), None);
         Ok(())
     }
 

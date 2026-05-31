@@ -293,7 +293,9 @@ impl PostIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{Points, PostComments, PostId, PostScore, PostTitle, PostUrl, SourceId};
+    use crate::domain::{
+        ExternalUrl, Points, PostComments, PostId, PostScore, PostTitle, SourceId,
+    };
 
     const HOUR: i64 = 3600;
 
@@ -306,7 +308,7 @@ mod tests {
             SourceId::HackerNews,
             PostId::new("x").unwrap(),
             PostTitle::new("t").unwrap(),
-            PostUrl::new("u").unwrap(),
+            Some(ExternalUrl::new("u").unwrap()),
             DateTime::now(),
             PostComments::new(comments).unwrap(),
             PostScore::Points(Points::new(score).unwrap()),

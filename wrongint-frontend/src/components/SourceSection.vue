@@ -42,22 +42,25 @@ export default defineComponent({
     <div class="contention">
       <a
         v-for="item in [
-          { label: 'MOST CONTENTIOUS', post: mostContentious },
-          { label: 'LEAST CONTENTIOUS', post: leastContentious },
+          { emoji: '😡', label: 'WIRED', post: mostContentious },
+          { emoji: '😴', label: 'TIRED', post: leastContentious },
         ]"
         :key="item.label"
         class="contender"
         :class="{ empty: !item.post }"
-        :href="item.post?.url"
+        :href="item.post?.comments_url"
         target="_blank"
         rel="noopener noreferrer"
       >
-        <span class="contender-label">{{ item.label }}</span>
-        <span v-if="item.post" class="contender-title">{{ item.post.title }}</span>
-        <span v-else class="contender-title muted">no data</span>
-        <span v-if="item.post" class="contender-meta">
-          <span class="contender-idx">idx {{ fmt(item.post.index) }}</span>
-          <span class="contender-cs">{{ item.post.comments }}c / {{ item.post.score }}p</span>
+        <span class="contender-emoji">{{ item.emoji }}</span>
+        <span class="contender-body">
+          <span class="contender-label">{{ item.label }}</span>
+          <span v-if="item.post" class="contender-title">{{ item.post.title }}</span>
+          <span v-else class="contender-title muted">no data</span>
+          <span v-if="item.post" class="contender-meta">
+            <span class="contender-idx">idx {{ fmt(item.post.index) }}</span>
+            <span class="contender-cs">{{ item.post.comments }}c / {{ item.post.score }}p</span>
+          </span>
         </span>
       </a>
     </div>

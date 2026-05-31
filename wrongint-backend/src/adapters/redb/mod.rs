@@ -2,8 +2,8 @@ use crate::app;
 use crate::app::Transactor;
 use crate::domain::time::DateTime;
 use crate::domain::{
-    Points, Post, PostComments, PostId, PostScore, PostTitle, PostUrl, Snapshot, Source, SourceId,
-    UpvotesAndDownvotes,
+    ExternalUrl, Points, Post, PostComments, PostId, PostScore, PostTitle, Snapshot, Source,
+    SourceId, UpvotesAndDownvotes,
 };
 use crate::errors::Result;
 use anyhow::{Context, anyhow};
@@ -103,7 +103,7 @@ struct PersistedPost {
     source: u8,
     post_id: String,
     title: String,
-    url: String,
+    external_url: Option<String>,
     posted_at: i64,
     comments: i64,
     score: PersistedScore,
@@ -115,7 +115,7 @@ impl From<&Post> for PersistedPost {
             source: source_to_u8(p.source()),
             post_id: p.post_id().as_str().to_string(),
             title: p.title().as_str().to_string(),
-            url: p.url().as_str().to_string(),
+            external_url: p.external_url().map(|u| u.as_str().to_string()),
             posted_at: p.posted_at().unix_timestamp(),
             comments: p.comments().value(),
             score: p.score().into(),
@@ -127,11 +127,12 @@ impl TryFrom<PersistedPost> for Post {
     type Error = crate::errors::Error;
 
     fn try_from(p: PersistedPost) -> std::result::Result<Self, Self::Error> {
+        let external_url = p.external_url.map(ExternalUrl::new).transpose()?;
         Ok(Post::new(
             source_from_u8(p.source)?,
             PostId::new(p.post_id)?,
             PostTitle::new(p.title)?,
-            PostUrl::new(p.url)?,
+            external_url,
             DateTime::new_from_unix_timestamp(p.posted_at)?,
             PostComments::new(p.comments)?,
             p.score.try_into()?,
@@ -414,7 +415,7 @@ mod tests {
             SourceId::HackerNews,
             PostId::new(id).unwrap(),
             PostTitle::new("t").unwrap(),
-            PostUrl::new("u").unwrap(),
+            Some(ExternalUrl::new("u").unwrap()),
             ts(0),
             PostComments::new(c).unwrap(),
             PostScore::Points(Points::new(s).unwrap()),

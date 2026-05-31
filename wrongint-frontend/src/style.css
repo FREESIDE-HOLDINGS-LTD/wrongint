@@ -299,8 +299,9 @@ h1 small {
 
 .contender {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
   padding: 10px 12px;
   border: 1px solid #1f262d;
   border-radius: 8px;
@@ -308,6 +309,20 @@ h1 small {
   text-decoration: none;
   color: var(--text);
   overflow: hidden;
+}
+
+.contender-emoji {
+  font-size: 40px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.contender-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
 }
 
 .contender:hover {

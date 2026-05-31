@@ -106,7 +106,7 @@ pub struct Post {
     source: SourceId,
     post_id: PostId,
     title: PostTitle,
-    url: PostUrl,
+    external_url: Option<ExternalUrl>,
     posted_at: DateTime,
     comments: PostComments,
     score: PostScore,
@@ -117,7 +117,7 @@ impl Post {
         source: SourceId,
         post_id: PostId,
         title: PostTitle,
-        url: PostUrl,
+        external_url: Option<ExternalUrl>,
         posted_at: DateTime,
         comments: PostComments,
         score: PostScore,
@@ -126,7 +126,7 @@ impl Post {
             source,
             post_id,
             title,
-            url,
+            external_url,
             posted_at,
             comments,
             score,
@@ -145,8 +145,18 @@ impl Post {
         &self.title
     }
 
-    pub fn url(&self) -> &PostUrl {
-        &self.url
+    pub fn comments_url(&self) -> CommentsUrl {
+        let url = match self.source {
+            SourceId::HackerNews => {
+                format!("https://news.ycombinator.com/item?id={}", self.post_id)
+            }
+            SourceId::Lobsters => format!("https://lobste.rs/s/{}", self.post_id),
+        };
+        CommentsUrl::new(url).expect("post id is non-empty so comments url is non-empty")
+    }
+
+    pub fn external_url(&self) -> Option<&ExternalUrl> {
+        self.external_url.as_ref()
     }
 
     pub fn posted_at(&self) -> DateTime {
@@ -235,15 +245,15 @@ impl fmt::Display for PostTitle {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PostUrl {
+pub struct CommentsUrl {
     value: String,
 }
 
-impl PostUrl {
+impl CommentsUrl {
     pub fn new(s: impl Into<String>) -> Result<Self> {
         let value = s.into();
         if value.is_empty() {
-            return Err(anyhow!("post url can't be empty").into());
+            return Err(anyhow!("comments url can't be empty").into());
         }
         Ok(Self { value })
     }
@@ -253,7 +263,32 @@ impl PostUrl {
     }
 }
 
-impl fmt::Display for PostUrl {
+impl fmt::Display for CommentsUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ExternalUrl {
+    value: String,
+}
+
+impl ExternalUrl {
+    pub fn new(s: impl Into<String>) -> Result<Self> {
+        let value = s.into();
+        if value.is_empty() {
+            return Err(anyhow!("external url can't be empty").into());
+        }
+        Ok(Self { value })
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.value
+    }
+}
+
+impl fmt::Display for ExternalUrl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.value)
     }
@@ -349,7 +384,7 @@ mod tests {
             SourceId::HackerNews,
             PostId::new("x")?,
             PostTitle::new("t")?,
-            PostUrl::new("u")?,
+            Some(ExternalUrl::new("u")?),
             DateTime::now(),
             PostComments::new(c)?,
             s,
@@ -484,7 +519,7 @@ mod tests {
                 SourceId::Lobsters,
                 PostId::new("abc")?,
                 PostTitle::new("title")?,
-                PostUrl::new("https://e.com/a")?,
+                Some(ExternalUrl::new("https://e.com/a")?),
                 posted,
                 PostComments::new(9)?,
                 PostScore::UpvotesAndDownvotes(UpvotesAndDownvotes::new(12, 2)?),
@@ -492,7 +527,11 @@ mod tests {
             assert_eq!(post.source(), SourceId::Lobsters);
             assert_eq!(post.post_id().as_str(), "abc");
             assert_eq!(post.title().as_str(), "title");
-            assert_eq!(post.url().as_str(), "https://e.com/a");
+            assert_eq!(post.comments_url().as_str(), "https://lobste.rs/s/abc");
+            assert_eq!(
+                post.external_url().map(|u| u.as_str()),
+                Some("https://e.com/a")
+            );
             assert_eq!(post.posted_at(), posted);
             assert_eq!(post.comments().value(), 9);
             assert_eq!(
@@ -508,7 +547,7 @@ mod tests {
                 SourceId::HackerNews,
                 PostId::new("38901234")?,
                 PostTitle::new("Show HN: A redb-backed time series for forum sentiment")?,
-                PostUrl::new("https://news.ycombinator.com/item?id=38901234")?,
+                Some(ExternalUrl::new("https://example.com/show")?),
                 DateTime::new_from_rfc3339("2024-01-02T15:04:05Z")?,
                 PostComments::new(128)?,
                 PostScore::Points(Points::new(342)?),
@@ -516,7 +555,7 @@ mod tests {
             assert_eq!(post.source(), SourceId::HackerNews);
             assert_eq!(post.post_id().as_str(), "38901234");
             assert_eq!(
-                post.url().as_str(),
+                post.comments_url().as_str(),
                 "https://news.ycombinator.com/item?id=38901234"
             );
             assert_eq!(post.score(), PostScore::Points(Points::new(342)?));
@@ -529,14 +568,14 @@ mod tests {
                 SourceId::Lobsters,
                 PostId::new("xq8dao")?,
                 PostTitle::new("Hexagonal architecture in Rust, revisited")?,
-                PostUrl::new("https://lobste.rs/s/xq8dao")?,
+                Some(ExternalUrl::new("https://example.com/hex")?),
                 DateTime::new_from_rfc3339("2024-01-02T09:30:00Z")?,
                 PostComments::new(37)?,
                 PostScore::UpvotesAndDownvotes(UpvotesAndDownvotes::new(54, 6)?),
             );
             assert_eq!(post.source(), SourceId::Lobsters);
             assert_eq!(post.post_id().as_str(), "xq8dao");
-            assert_eq!(post.url().as_str(), "https://lobste.rs/s/xq8dao");
+            assert_eq!(post.comments_url().as_str(), "https://lobste.rs/s/xq8dao");
             match post.score() {
                 PostScore::UpvotesAndDownvotes(v) => assert_eq!(v.net(), 48),
                 _ => panic!("wrong variant"),
@@ -594,14 +633,18 @@ mod tests {
 
         #[test]
         fn rejects_empty() {
-            assert!(PostUrl::new("").is_err());
+            assert!(CommentsUrl::new("").is_err());
+            assert!(ExternalUrl::new("").is_err());
         }
 
         #[test]
         fn exposes_value() -> Result<()> {
-            let url = PostUrl::new("https://e.com")?;
-            assert_eq!(url.as_str(), "https://e.com");
-            assert_eq!(url.to_string(), "https://e.com");
+            let comments = CommentsUrl::new("https://e.com/c")?;
+            assert_eq!(comments.as_str(), "https://e.com/c");
+            assert_eq!(comments.to_string(), "https://e.com/c");
+            let external = ExternalUrl::new("https://e.com")?;
+            assert_eq!(external.as_str(), "https://e.com");
+            assert_eq!(external.to_string(), "https://e.com");
             Ok(())
         }
     }

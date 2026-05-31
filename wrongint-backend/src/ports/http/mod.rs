@@ -326,7 +326,8 @@ impl From<&Snapshot> for ApiSnapshot {
 struct ApiPost {
     id: String,
     title: String,
-    url: String,
+    comments_url: String,
+    external_url: Option<String>,
     posted_at: String,
     comments: i64,
     score: i64,
@@ -338,7 +339,8 @@ impl From<&Post> for ApiPost {
         Self {
             id: p.post_id().as_str().to_string(),
             title: p.title().as_str().to_string(),
-            url: p.url().as_str().to_string(),
+            comments_url: p.comments_url().as_str().to_string(),
+            external_url: p.external_url().map(|u| u.as_str().to_string()),
             posted_at: p.posted_at().to_rfc3339(),
             comments: p.comments().value(),
             score: p.score().net(),
