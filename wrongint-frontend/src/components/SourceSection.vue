@@ -1,19 +1,49 @@
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue'
 import IndexChart from './IndexChart.vue'
-import type { IndexCandles, Post } from '../api'
+import { indexSymbol, sourceLabel, sourceColors, type IndexCandles, type Post } from '../api'
 import { rangeOf, heat, accent, isHot, type Range } from '../heat'
+
+// Last two non-null closes, newest first.
+function recentCloses(candles: IndexCandles | null): number[] {
+  const list = candles?.candles ?? []
+  const closes: number[] = []
+  for (let i = list.length - 1; i >= 0 && closes.length < 2; i--) {
+    if (list[i].close != null) closes.push(list[i].close as number)
+  }
+  return closes
+}
 
 export default defineComponent({
   name: 'SourceSection',
   components: { IndexChart },
   props: {
-    title: { type: String, required: true },
+    source: { type: String, required: true },
     candles: { type: Object as PropType<IndexCandles | null>, default: null },
     posts: { type: Array as PropType<Post[]>, default: () => [] },
-    color: { type: String, default: '#39ff14' },
   },
   computed: {
+    symbol(): string {
+      return indexSymbol(this.source)
+    },
+    label(): string {
+      return sourceLabel(this.source)
+    },
+    headColor(): string {
+      return sourceColors(this.source).up
+    },
+    latest(): number | null {
+      return recentCloses(this.candles)[0] ?? null
+    },
+    dir(): number {
+      const closes = recentCloses(this.candles)
+      return closes.length < 2 ? 0 : Math.sign(closes[0] - closes[1])
+    },
+    readoutColor(): string {
+      if (this.latest == null || this.dir === 0) return '#5a6470'
+      const c = sourceColors(this.source)
+      return this.dir > 0 ? c.up : c.down
+    },
     rated(): Post[] {
       return this.posts.filter((p) => p.index != null)
     },
@@ -48,8 +78,15 @@ export default defineComponent({
 
 <template>
   <section class="source-section">
-    <h2 class="section-head" :style="{ color, borderColor: color }">
-      <span class="section-head-mark">▌</span>{{ title }}
+    <h2 class="section-head" :style="{ color: headColor, borderColor: headColor }">
+      <span class="section-head-name"><span class="section-head-mark">▌</span>{{ label }}</span>
+      <span class="section-readout" :style="{ color: readoutColor }">
+        <span class="section-readout-sym">{{ symbol }}</span>
+        <span class="section-readout-num" :class="{ blink: dir > 0 }">
+          <span class="section-readout-val">{{ latest == null ? '——' : latest.toFixed(0) }}</span>
+          <span v-if="dir !== 0" class="section-readout-arrow">{{ dir > 0 ? '▲' : '▼' }}</span>
+        </span>
+      </span>
     </h2>
     <div class="contention">
       <a
@@ -79,6 +116,6 @@ export default defineComponent({
         </span>
       </a>
     </div>
-    <IndexChart :title="title" :candles="candles" :color="color" :height="320" />
+    <IndexChart :source="source" :candles="candles" :height="320" :head="false" />
   </section>
 </template>

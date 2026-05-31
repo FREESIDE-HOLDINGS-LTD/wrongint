@@ -81,7 +81,7 @@ body {
   display: flex;
   padding: 8px 0;
   width: max-content;
-  animation: marquee 28s linear infinite;
+  animation: marquee 16s linear infinite;
 }
 
 /* Each group is at least a full viewport wide and distributes its items
@@ -115,7 +115,7 @@ body {
 
 .tick-value {
   color: var(--neon);
-  text-shadow: 0 0 8px var(--neon);
+  text-shadow: 0 0 8px currentColor;
   font-weight: 700;
 }
 
@@ -223,18 +223,21 @@ main {
   max-width: 1100px;
   margin: 0 auto;
   padding: 22px 16px 60px;
+  container-type: inline-size;
 }
 
 h1 {
-  font-size: 44px;
   font-weight: 800;
-  letter-spacing: 3px;
   margin: 16px 0 24px;
   text-transform: uppercase;
   text-align: center;
 }
 
 .logo {
+  display: block;
+  white-space: nowrap;
+  font-size: 5.4cqw;
+  letter-spacing: 1px;
   color: var(--neon);
   text-shadow:
     0 0 8px var(--neon),
@@ -244,10 +247,10 @@ h1 {
 h1 small {
   display: block;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 22px;
   font-weight: 400;
-  letter-spacing: 2px;
-  margin-top: 6px;
+  letter-spacing: 3px;
+  margin-top: 10px;
 }
 
 .error {
@@ -275,6 +278,45 @@ h1 small {
   box-shadow:
     inset 0 0 30px rgba(57, 255, 20, 0.04),
     0 0 16px rgba(0, 0, 0, 0.6);
+}
+
+.global-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 28px 0 20px;
+}
+
+.global-hero-label {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+
+.global-hero-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 88px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 2px;
+  color: var(--neon);
+  text-shadow: 0 0 24px currentColor;
+}
+
+.global-hero-arrow {
+  font-size: 40px;
+}
+
+.global-hero-sym {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 3px;
 }
 
 .chart-head {
@@ -337,6 +379,10 @@ h1 small {
 }
 
 .section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
   font-size: 30px;
   font-weight: 800;
   letter-spacing: 3px;
@@ -350,6 +396,29 @@ h1 small {
 .section-head-mark {
   margin-right: 10px;
   opacity: 0.7;
+}
+
+.section-readout {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 12px currentColor;
+}
+
+.section-readout-sym {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.section-readout-val {
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.section-readout-arrow {
+  font-size: 18px;
 }
 
 .contention {

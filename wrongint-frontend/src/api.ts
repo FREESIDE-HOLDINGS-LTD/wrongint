@@ -1,6 +1,17 @@
 export type IndexSource = 'all' | 'hackernews' | 'lobsters'
 
-// Canonical display names for sources; used everywhere a source is shown.
+// Ticker-style identifier for each index; used everywhere an index is named.
+export const INDEX_SYMBOLS: Record<string, string> = {
+  all: 'idx:global',
+  hackernews: 'idx:hn',
+  lobsters: 'idx:lob',
+}
+
+export function indexSymbol(source: string): string {
+  return INDEX_SYMBOLS[source] ?? `idx:${source.toLowerCase()}`
+}
+
+// Full display names; used for section headers.
 export const SOURCE_LABELS: Record<string, string> = {
   all: 'GLOBAL',
   hackernews: 'HACKER NEWS',
@@ -9,6 +20,22 @@ export const SOURCE_LABELS: Record<string, string> = {
 
 export function sourceLabel(source: string): string {
   return SOURCE_LABELS[source] ?? source.toUpperCase()
+}
+
+// Per-index up/down colors. Up is the bright brand tone, down its dark variant.
+export interface SourceColors {
+  up: string
+  down: string
+}
+
+export const SOURCE_COLORS: Record<string, SourceColors> = {
+  all: { up: '#39ff14', down: '#ff2e63' },
+  hackernews: { up: '#ffb454', down: '#9c5200' },
+  lobsters: { up: '#c9aaff', down: '#5e35b1' },
+}
+
+export function sourceColors(source: string): SourceColors {
+  return SOURCE_COLORS[source] ?? SOURCE_COLORS.all
 }
 
 export interface IndexCandle {

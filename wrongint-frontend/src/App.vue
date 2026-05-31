@@ -4,7 +4,14 @@ import IndexChart from './components/IndexChart.vue'
 import Ticker, { type TickerItem } from './components/Ticker.vue'
 import PostsCarousel, { type CarouselPost } from './components/PostsCarousel.vue'
 import SourceSection from './components/SourceSection.vue'
-import { fetchIndexCandles, fetchSnapshot, sourceLabel, type IndexCandles, type Post } from './api'
+import {
+  fetchIndexCandles,
+  fetchSnapshot,
+  indexSymbol,
+  sourceColors,
+  type IndexCandles,
+  type Post,
+} from './api'
 
 const REFRESH_MS = 60_000
 
@@ -19,12 +26,23 @@ interface State {
   timer?: ReturnType<typeof setInterval>
 }
 
-function latestOf(candles: IndexCandles | null): number | null {
+// Last two non-null closes, newest first.
+function recentCloses(candles: IndexCandles | null): number[] {
   const list = candles?.candles ?? []
-  for (let i = list.length - 1; i >= 0; i--) {
-    if (list[i].close != null) return list[i].close
+  const closes: number[] = []
+  for (let i = list.length - 1; i >= 0 && closes.length < 2; i--) {
+    if (list[i].close != null) closes.push(list[i].close as number)
   }
-  return null
+  return closes
+}
+
+function latestOf(candles: IndexCandles | null): number | null {
+  return recentCloses(candles)[0] ?? null
+}
+
+function dirOf(candles: IndexCandles | null): number {
+  const closes = recentCloses(candles)
+  return closes.length < 2 ? 0 : Math.sign(closes[0] - closes[1])
 }
 
 export default defineComponent({
@@ -45,10 +63,24 @@ export default defineComponent({
   computed: {
     ticker(): TickerItem[] {
       return [
-        { label: sourceLabel('all'), value: latestOf(this.global) },
-        { label: sourceLabel('hackernews'), value: latestOf(this.hackernews) },
-        { label: sourceLabel('lobsters'), value: latestOf(this.lobsters) },
+        { source: 'all', value: latestOf(this.global), dir: dirOf(this.global) },
+        { source: 'hackernews', value: latestOf(this.hackernews), dir: dirOf(this.hackernews) },
+        { source: 'lobsters', value: latestOf(this.lobsters), dir: dirOf(this.lobsters) },
       ]
+    },
+    globalValue(): number | null {
+      return latestOf(this.global)
+    },
+    globalDir(): number {
+      return dirOf(this.global)
+    },
+    globalSymbol(): string {
+      return indexSymbol('all')
+    },
+    globalColor(): string {
+      if (this.globalValue == null || this.globalDir === 0) return '#5a6470'
+      const c = sourceColors('all')
+      return this.globalDir > 0 ? c.up : c.down
     },
   },
   mounted() {
@@ -59,7 +91,6 @@ export default defineComponent({
     clearInterval(this.timer)
   },
   methods: {
-    sourceLabel,
     async load() {
       try {
         const [global, hackernews, lobsters, hnSnap, lobSnap] = await Promise.all([
@@ -105,26 +136,24 @@ export default defineComponent({
 
   <main>
     <h1>
-      <span class="logo">FREESIDE OBSERVATION GROUP</span>
-      <span class="blink">_</span>
+      <span class="logo">FREESIDE GLOBAL OBSERVATION GROUP<span class="blink">_</span></span>
       <small>WE ARE MONITORING THE SITUATION</small>
     </h1>
 
     <p v-if="error" class="error blink">!! {{ error }}</p>
 
-    <IndexChart :title="sourceLabel('all')" :candles="global" :height="340" color="#39ff14" />
+    <div class="global-hero">
+      <span class="global-hero-num" :class="{ blink: globalDir > 0 }" :style="{ color: globalColor }">
+        {{ globalValue == null ? '——' : globalValue.toFixed(0) }}
+        <span v-if="globalDir !== 0" class="global-hero-arrow">{{ globalDir > 0 ? '▲' : '▼' }}</span>
+      </span>
+      <span class="global-hero-label">GLOBAL INTERNET DRAMA INDEX</span>
+      <span class="global-hero-sym">{{ globalSymbol }}</span>
+    </div>
 
-    <SourceSection
-      :title="sourceLabel('hackernews')"
-      :candles="hackernews"
-      :posts="hnPosts"
-      color="#ff9f1c"
-    />
-    <SourceSection
-      :title="sourceLabel('lobsters')"
-      :candles="lobsters"
-      :posts="lobPosts"
-      color="#b388ff"
-    />
+    <IndexChart source="all" :candles="global" :height="340" :head="false" />
+
+    <SourceSection source="hackernews" :candles="hackernews" :posts="hnPosts" />
+    <SourceSection source="lobsters" :candles="lobsters" :posts="lobPosts" />
   </main>
 </template>

@@ -1,16 +1,28 @@
 <script lang="ts">
 import { defineComponent, markRaw, type PropType } from 'vue'
 import uPlot from 'uplot'
-import type { IndexCandles } from '../api'
+import { indexSymbol, sourceColors, type IndexCandles } from '../api'
 import { candlestickPlugin } from '../candlestick'
 
 export default defineComponent({
   name: 'IndexChart',
   props: {
-    title: { type: String, required: true },
+    source: { type: String, required: true },
     candles: { type: Object as PropType<IndexCandles | null>, default: null },
-    color: { type: String, default: '#39ff14' },
     height: { type: Number, default: 260 },
+    head: { type: Boolean, default: true },
+  },
+  computed: {
+    symbol(): string {
+      return indexSymbol(this.source)
+    },
+    colors(): { up: string; down: string } {
+      return sourceColors(this.source)
+    },
+    valueColor(): string {
+      if (this.latest == null || this.dir === 0) return '#5a6470'
+      return this.dir > 0 ? this.colors.up : this.colors.down
+    },
   },
   data(): { plot: uPlot | null; latest: number | null; dir: number; flashKey: number } {
     return { plot: null, latest: null, dir: 0, flashKey: 0 }
@@ -63,7 +75,9 @@ export default defineComponent({
         height: this.height,
         cursor: { drag: { x: true, y: false } },
         scales: { x: { time: true } },
-        plugins: [candlestickPlugin({ up: this.color, down: '#ff2e63', wick: '#5a6470' })],
+        plugins: [
+          candlestickPlugin({ up: this.colors.up, down: this.colors.down, wick: '#5a6470' }),
+        ],
         series: [
           {},
           { label: 'open', ...noLine },
@@ -108,15 +122,18 @@ export default defineComponent({
 
 <template>
   <div class="panel">
-    <div class="chart-head">
-      <span class="chart-title">{{ title }}</span>
+    <div v-if="head" class="chart-head">
+      <span class="chart-title">{{ symbol }}</span>
       <span
         :key="flashKey"
         class="chart-value flash"
-        :class="{ up: dir > 0, down: dir < 0, dead: latest == null }"
+        :class="{ dead: latest == null }"
+        :style="{ color: valueColor }"
       >
-        {{ latest == null ? '——' : latest.toFixed(0) }}
-        <span v-if="dir !== 0" class="arrow">{{ dir > 0 ? '▲' : '▼' }}</span>
+        <span class="chart-value-num" :class="{ blink: dir > 0 }">
+          {{ latest == null ? '——' : latest.toFixed(0) }}
+          <span v-if="dir !== 0" class="arrow">{{ dir > 0 ? '▲' : '▼' }}</span>
+        </span>
       </span>
     </div>
     <div ref="host"></div>
