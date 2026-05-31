@@ -12,14 +12,21 @@ COPY wrongint-backend/ ./wrongint-backend/
 # rust-embed reads ../wrongint-frontend/dist relative to the backend crate.
 COPY --from=frontend /app/wrongint-frontend/dist ./wrongint-frontend/dist
 WORKDIR /app/wrongint-backend
-RUN cargo build --release --features embed-frontend
+# Cache the cargo registry/git and the target dir across builds (BuildKit).
+# The target dir is a cache mount and is NOT part of the image, so copy the
+# built binary out to a real path in the same RUN step.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/app/wrongint-backend/target \
+    cargo build --release --features embed-frontend \
+    && cp target/release/wrongint-backend /usr/local/bin/wrongint-backend
 
 # ---- Stage 3: runtime ----
 FROM debian:bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3 \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=backend /app/wrongint-backend/target/release/wrongint-backend /usr/local/bin/wrongint-backend
+COPY --from=backend /usr/local/bin/wrongint-backend /usr/local/bin/wrongint-backend
 RUN mkdir -p /data
 VOLUME /data
 EXPOSE 8080
