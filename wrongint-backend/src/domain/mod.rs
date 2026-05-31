@@ -5,24 +5,62 @@ use crate::errors::Result;
 use anyhow::anyhow;
 use std::fmt;
 
-pub const SNAPSHOT_INTERVAL_SECONDS: u64 = 10 * 60;
+pub const CAPTURE_INTERVAL_SECONDS: u64 = 10 * 60;
+pub const RETRY_INTERVAL_SECONDS: u64 = 5 * 60;
 
-pub struct Snapshots {
-    last: Option<Snapshot>,
+#[derive(Debug, Clone)]
+pub struct Source {
+    id: SourceId,
+    last_snapshot: Option<Snapshot>,
+    last_attempt_at: Option<DateTime>,
 }
 
-impl Snapshots {
-    pub fn new(last: Option<Snapshot>) -> Self {
-        Self { last }
+impl Source {
+    pub fn new(
+        id: SourceId,
+        last_snapshot: Option<Snapshot>,
+        last_attempt_at: Option<DateTime>,
+    ) -> Self {
+        Self {
+            id,
+            last_snapshot,
+            last_attempt_at,
+        }
+    }
+
+    pub fn id(&self) -> SourceId {
+        self.id
+    }
+
+    pub fn last_snapshot(&self) -> Option<&Snapshot> {
+        self.last_snapshot.as_ref()
+    }
+
+    pub fn last_attempt_at(&self) -> Option<DateTime> {
+        self.last_attempt_at
+    }
+
+    pub fn record_attempt(&mut self, at: DateTime) {
+        self.last_attempt_at = Some(at);
+    }
+
+    pub fn record_capture(&mut self, snapshot: Snapshot, at: DateTime) {
+        self.last_snapshot = Some(snapshot);
+        self.last_attempt_at = Some(at);
     }
 
     pub fn should_capture_new_snapshot(&self, now: DateTime) -> bool {
-        match &self.last {
-            None => true,
-            Some(snapshot) => {
-                now - snapshot.captured_at() >= Duration::new_from_seconds(SNAPSHOT_INTERVAL_SECONDS)
-            }
+        if let Some(snapshot) = &self.last_snapshot
+            && now - snapshot.captured_at() < Duration::new_from_seconds(CAPTURE_INTERVAL_SECONDS)
+        {
+            return false;
         }
+        if let Some(attempt) = self.last_attempt_at
+            && now - attempt < Duration::new_from_seconds(RETRY_INTERVAL_SECONDS)
+        {
+            return false;
+        }
+        true
     }
 }
 
@@ -152,6 +190,12 @@ impl Post {
 pub enum SourceId {
     HackerNews,
     Lobsters,
+}
+
+impl SourceId {
+    pub fn all() -> [SourceId; 2] {
+        [SourceId::HackerNews, SourceId::Lobsters]
+    }
 }
 
 impl fmt::Display for SourceId {
@@ -327,7 +371,7 @@ mod tests {
         ))
     }
 
-    mod snapshots {
+    mod source {
         use super::super::*;
 
         fn at(unix: i64) -> Result<DateTime> {
@@ -343,22 +387,46 @@ mod tests {
         }
 
         #[test]
-        fn captures_when_no_previous_snapshot() {
-            let snapshots = Snapshots::new(None);
-            assert!(snapshots.should_capture_new_snapshot(DateTime::now()));
+        fn captures_when_never_attempted_or_captured() {
+            let source = Source::new(SourceId::HackerNews, None, None);
+            assert!(source.should_capture_new_snapshot(DateTime::now()));
         }
 
         #[test]
-        fn skips_when_within_interval() -> Result<()> {
-            let snapshots = Snapshots::new(Some(snapshot_at(at(1_780_000_000)?)?));
-            assert!(!snapshots.should_capture_new_snapshot(at(1_780_000_300)?));
+        fn skips_within_retry_backoff_after_failed_attempt() -> Result<()> {
+            let source = Source::new(SourceId::HackerNews, None, Some(at(1_780_000_000)?));
+            assert!(!source.should_capture_new_snapshot(at(1_780_000_200)?));
             Ok(())
         }
 
         #[test]
-        fn captures_when_interval_elapsed() -> Result<()> {
-            let snapshots = Snapshots::new(Some(snapshot_at(at(1_780_000_000)?)?));
-            assert!(snapshots.should_capture_new_snapshot(at(1_780_000_600)?));
+        fn retries_after_retry_backoff_elapsed() -> Result<()> {
+            let source = Source::new(SourceId::HackerNews, None, Some(at(1_780_000_000)?));
+            assert!(source.should_capture_new_snapshot(at(1_780_000_360)?));
+            Ok(())
+        }
+
+        #[test]
+        fn skips_within_capture_interval_after_success() -> Result<()> {
+            let captured_at = at(1_780_000_000)?;
+            let source = Source::new(
+                SourceId::HackerNews,
+                Some(snapshot_at(captured_at)?),
+                Some(captured_at),
+            );
+            assert!(!source.should_capture_new_snapshot(at(1_780_000_400)?));
+            Ok(())
+        }
+
+        #[test]
+        fn captures_after_capture_interval_elapsed() -> Result<()> {
+            let captured_at = at(1_780_000_000)?;
+            let source = Source::new(
+                SourceId::HackerNews,
+                Some(snapshot_at(captured_at)?),
+                Some(captured_at),
+            );
+            assert!(source.should_capture_new_snapshot(at(1_780_000_660)?));
             Ok(())
         }
     }

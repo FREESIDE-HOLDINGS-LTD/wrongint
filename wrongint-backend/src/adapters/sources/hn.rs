@@ -1,16 +1,13 @@
-use crate::app;
 use crate::domain::time::DateTime;
-use crate::domain::{
-    Points, Post, PostComments, PostId, PostScore, PostTitle, PostUrl, SourceId,
-};
+use crate::domain::{Points, Post, PostComments, PostId, PostScore, PostTitle, PostUrl, SourceId};
 use crate::errors::Result;
-use async_trait::async_trait;
 use futures::stream::StreamExt;
 use serde::Deserialize;
 
 const TOP_STORIES_URL: &str = "https://hacker-news.firebaseio.com/v0/topstories.json";
 const ITEM_CONCURRENCY: usize = 10;
 
+#[derive(Clone)]
 pub struct HackerNews {
     client: reqwest::Client,
     front_page_len: usize,
@@ -30,6 +27,41 @@ impl HackerNews {
 
     fn permalink(id: i64) -> String {
         format!("https://news.ycombinator.com/item?id={id}")
+    }
+
+    pub async fn fetch(&self) -> Result<Vec<Post>> {
+        let ids: Vec<i64> = self
+            .client
+            .get(TOP_STORIES_URL)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        let front: Vec<i64> = ids.into_iter().take(self.front_page_len).collect();
+
+        let items: Vec<Option<Post>> = futures::stream::iter(front)
+            .map(|id| {
+                let client = self.client.clone();
+                async move {
+                    let item: HnItem = client
+                        .get(Self::item_url(id))
+                        .send()
+                        .await?
+                        .error_for_status()?
+                        .json()
+                        .await?;
+                    Ok::<Option<Post>, crate::errors::Error>(item.into_post())
+                }
+            })
+            .buffer_unordered(ITEM_CONCURRENCY)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(items.into_iter().flatten().collect())
     }
 }
 
@@ -69,50 +101,8 @@ impl HnItem {
             PostUrl::new(url).ok()?,
             DateTime::new_from_unix_timestamp(self.time).ok()?,
             PostComments::new(self.descendants).ok()?,
-            PostScore::Points(Points::new(self.score)),
+            PostScore::Points(Points::new(self.score).ok()?),
         ))
-    }
-}
-
-#[async_trait]
-impl app::Source for HackerNews {
-    fn id(&self) -> SourceId {
-        SourceId::HackerNews
-    }
-
-    async fn fetch_front_page(&self) -> Result<Vec<Post>> {
-        let ids: Vec<i64> = self
-            .client
-            .get(TOP_STORIES_URL)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-
-        let front: Vec<i64> = ids.into_iter().take(self.front_page_len).collect();
-
-        let items: Vec<Option<Post>> = futures::stream::iter(front)
-            .map(|id| {
-                let client = self.client.clone();
-                async move {
-                    let item: HnItem = client
-                        .get(Self::item_url(id))
-                        .send()
-                        .await?
-                        .error_for_status()?
-                        .json()
-                        .await?;
-                    Ok::<Option<Post>, crate::errors::Error>(item.into_post())
-                }
-            })
-            .buffer_unordered(ITEM_CONCURRENCY)
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>>>()?;
-
-        Ok(items.into_iter().flatten().collect())
     }
 }
 
@@ -121,43 +111,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn maps_story_item() {
+    fn maps_story_item() -> Result<()> {
         let json = r#"{"id":1,"type":"story","score":100,"descendants":42,
             "title":"hello","url":"https://example.com"}"#;
-        let item: HnItem = serde_json::from_str(json).unwrap();
-        let post = item.into_post().unwrap();
+        let item: HnItem = serde_json::from_str(json)?;
+        let post = item.into_post().expect("should map to a post");
         assert_eq!(post.post_id().as_str(), "1");
-        assert_eq!(post.score(), PostScore::Points(100));
+        assert_eq!(post.score(), PostScore::Points(Points::new(100)?));
         assert_eq!(post.comments().value(), 42);
         assert_eq!(post.url().as_str(), "https://example.com");
+        Ok(())
     }
 
     #[test]
-    fn self_post_uses_permalink() {
+    fn self_post_uses_permalink() -> Result<()> {
         let json = r#"{"id":7,"type":"story","score":5,"descendants":0,"title":"ask"}"#;
-        let item: HnItem = serde_json::from_str(json).unwrap();
-        let post = item.into_post().unwrap();
+        let item: HnItem = serde_json::from_str(json)?;
+        let post = item.into_post().expect("should map to a post");
         assert_eq!(
             post.url().as_str(),
             "https://news.ycombinator.com/item?id=7"
         );
+        Ok(())
     }
 
     #[test]
-    fn skips_non_story_and_dead() {
+    fn skips_non_story_and_dead() -> Result<()> {
         let job = r#"{"id":2,"type":"job","score":1}"#;
-        assert!(
-            serde_json::from_str::<HnItem>(job)
-                .unwrap()
-                .into_post()
-                .is_none()
-        );
+        assert!(serde_json::from_str::<HnItem>(job)?.into_post().is_none());
         let dead = r#"{"id":3,"type":"story","score":1,"dead":true}"#;
-        assert!(
-            serde_json::from_str::<HnItem>(dead)
-                .unwrap()
-                .into_post()
-                .is_none()
-        );
+        assert!(serde_json::from_str::<HnItem>(dead)?.into_post().is_none());
+        Ok(())
     }
 }

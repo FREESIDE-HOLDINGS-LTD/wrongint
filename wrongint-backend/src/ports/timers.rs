@@ -1,40 +1,33 @@
-use crate::app::IngestService;
-use crate::domain::time::DateTime;
-use log::info;
-use std::sync::Arc;
+use crate::app::CaptureSnapshotsHandler;
+use log::{debug, error};
 use std::time::Duration;
+use tokio::time::sleep;
 
-pub struct Scheduler {
-    ingest: Arc<IngestService>,
-    interval: Duration,
+static TICK_EVERY: Duration = Duration::from_secs(60);
+
+pub struct CaptureSnapshotsTimer<H: CaptureSnapshotsHandler> {
+    handler: H,
 }
 
-impl Scheduler {
-    pub fn new(ingest: Arc<IngestService>, interval: Duration) -> Self {
-        Self { ingest, interval }
+impl<H> CaptureSnapshotsTimer<H>
+where
+    H: CaptureSnapshotsHandler,
+{
+    pub fn new(handler: H) -> Self {
+        Self { handler }
     }
 
     pub async fn run(&self) {
-        self.align_to_boundary().await;
-
-        let mut ticker = tokio::time::interval(self.interval);
         loop {
-            ticker.tick().await;
-            let tick = DateTime::now();
-            let report = self.ingest.ingest_tick(tick).await;
-            info!("ingest tick {tick}: {report}");
-        }
-    }
-
-    async fn align_to_boundary(&self) {
-        let interval_secs = self.interval.as_secs() as i64;
-        if interval_secs <= 1 {
-            return;
-        }
-        let now = DateTime::now().unix_timestamp();
-        let wait = interval_secs - (now % interval_secs);
-        if wait != interval_secs {
-            tokio::time::sleep(Duration::from_secs(wait as u64)).await;
+            match self.handler.handle().await {
+                Ok(_) => {
+                    debug!("executed capture snapshots timer");
+                }
+                Err(err) => {
+                    error!("error executing capture snapshots timer: {}", err);
+                }
+            }
+            sleep(TICK_EVERY).await;
         }
     }
 }

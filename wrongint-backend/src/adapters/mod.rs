@@ -1,12 +1,13 @@
-pub mod db;
+pub mod redb;
 pub mod sources;
 
 use crate::app;
+use crate::app::ApplicationHandlerCallResult;
 use crate::config::Config;
-use crate::domain::SourceId;
-use crate::domain::time::DateTime;
+use crate::domain::time::Duration;
+use crate::domain::{Index, SourceId};
 use crate::errors::Result;
-use prometheus::{CounterVec, GaugeVec, Opts, Registry, labels};
+use prometheus::{CounterVec, GaugeVec, HistogramOpts, HistogramVec, Opts, Registry, labels};
 use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;
@@ -57,49 +58,54 @@ impl TryFrom<TomlConfig> for Config {
 #[derive(Clone)]
 pub struct Metrics {
     registry: Registry,
-    score: GaugeVec,
-    fetch_total: CounterVec,
-    last_sample_timestamp: GaugeVec,
-    posts_captured: GaugeVec,
+
+    metric_application_handler_calls_counter: CounterVec,
+    metric_application_handler_calls_histogram: HistogramVec,
+    metric_index: GaugeVec,
+    metric_posts_captured: GaugeVec,
 }
 
 impl Metrics {
     pub fn new() -> Result<Self> {
         let registry = Registry::new_custom(Some("wrongint".into()), None)?;
 
-        let score = GaugeVec::new(
-            Opts::new("score", "latest wrongint score (comments/upvotes)"),
-            &["source"],
-        )?;
-        registry.register(Box::new(score.clone()))?;
-
-        let fetch_total = CounterVec::new(
-            Opts::new("fetch_total", "front-page fetch attempts by result"),
-            &["source", "result"],
-        )?;
-        registry.register(Box::new(fetch_total.clone()))?;
-
-        let last_sample_timestamp = GaugeVec::new(
+        let metric_application_handler_calls_counter = CounterVec::new(
             Opts::new(
-                "last_sample_timestamp",
-                "unix seconds of the last successful sample",
+                "application_handler_calls_counter",
+                "application handler calls counter",
             ),
-            &["source"],
+            &["handler_name", "result"],
         )?;
-        registry.register(Box::new(last_sample_timestamp.clone()))?;
+        registry.register(Box::new(metric_application_handler_calls_counter.clone()))?;
 
-        let posts_captured = GaugeVec::new(
-            Opts::new("posts_captured", "post count in the last sample"),
+        let metric_application_handler_calls_histogram = HistogramVec::new(
+            HistogramOpts::new(
+                "application_handler_calls_histogram",
+                "application handler calls durations",
+            ),
+            &["handler_name", "result"],
+        )?;
+        registry.register(Box::new(metric_application_handler_calls_histogram.clone()))?;
+
+        let metric_index = GaugeVec::new(
+            Opts::new("index", "latest wrongint index (comments/score)"),
             &["source"],
         )?;
-        registry.register(Box::new(posts_captured.clone()))?;
+        registry.register(Box::new(metric_index.clone()))?;
+
+        let metric_posts_captured = GaugeVec::new(
+            Opts::new("posts_captured", "post count in the last snapshot"),
+            &["source"],
+        )?;
+        registry.register(Box::new(metric_posts_captured.clone()))?;
 
         Ok(Self {
             registry,
-            score,
-            fetch_total,
-            last_sample_timestamp,
-            posts_captured,
+
+            metric_application_handler_calls_counter,
+            metric_application_handler_calls_histogram,
+            metric_index,
+            metric_posts_captured,
         })
     }
 
@@ -109,32 +115,37 @@ impl Metrics {
 }
 
 impl app::Metrics for Metrics {
-    fn record_fetch(&self, source: SourceId, ok: bool) {
-        let source = source.to_string();
-        let result = if ok { "ok" } else { "err" };
-        self.fetch_total
-            .with(&labels! { "source" => source.as_str(), "result" => result })
+    fn record_application_handler_call(
+        &self,
+        handler_name: &str,
+        result: ApplicationHandlerCallResult,
+        duration: Duration,
+    ) {
+        let labels = labels! {
+            "handler_name" => handler_name,
+            "result" => match result {
+                ApplicationHandlerCallResult::Ok => "ok",
+                ApplicationHandlerCallResult::Error => "error",
+            },
+        };
+
+        self.metric_application_handler_calls_counter
+            .with(&labels)
             .inc();
+
+        self.metric_application_handler_calls_histogram
+            .with(&labels)
+            .observe(duration.to_std().as_secs_f64());
     }
 
-    fn set_score(&self, label: &str, score: Option<f64>) {
-        self.score
-            .with(&labels! { "source" => label })
-            .set(score.unwrap_or(f64::NAN));
-    }
-
-    fn set_last_sample(&self, source: SourceId, ts: DateTime) {
+    fn record_snapshot(&self, source: SourceId, index: Option<Index>, post_count: usize) {
         let source = source.to_string();
-        self.last_sample_timestamp
+        self.metric_index
             .with(&labels! { "source" => source.as_str() })
-            .set(ts.unix_timestamp() as f64);
-    }
-
-    fn set_posts_captured(&self, source: SourceId, count: usize) {
-        let source = source.to_string();
-        self.posts_captured
+            .set(index.map(|i| i.value()).unwrap_or(f64::NAN));
+        self.metric_posts_captured
             .with(&labels! { "source" => source.as_str() })
-            .set(count as f64);
+            .set(post_count as f64);
     }
 }
 

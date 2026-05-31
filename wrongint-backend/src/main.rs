@@ -1,17 +1,15 @@
 use clap::{Command, arg};
 use env_logger::Env;
 use log::{error, info};
-use std::sync::Arc;
-use std::time::Duration;
-use wrongint_backend::adapters::sources::{HackerNews, Lobsters, new_client};
-use wrongint_backend::adapters::{ConfigLoader, Metrics, db};
-use wrongint_backend::app::{self, IngestService, QueryService};
+use wrongint_backend::adapters::sources::{HackerNews, Lobsters, Sources, new_client};
+use wrongint_backend::adapters::{ConfigLoader, Metrics, redb};
+use wrongint_backend::app::CaptureSnapshotsHandler as _;
+use wrongint_backend::app::capture_snapshots::CaptureSnapshotsHandler;
+use wrongint_backend::app::get_index_series::GetIndexSeriesHandler;
 use wrongint_backend::config::Config;
-use wrongint_backend::domain::SourceId;
-use wrongint_backend::domain::time::DateTime;
 use wrongint_backend::errors::Result;
 use wrongint_backend::ports::http::{self, AppState};
-use wrongint_backend::ports::timers::Scheduler;
+use wrongint_backend::ports::timers::CaptureSnapshotsTimer;
 
 fn cli() -> Command {
     Command::new("wrongint")
@@ -22,7 +20,7 @@ fn cli() -> Command {
             Command::new("run")
                 .about("Runs the sampler + HTTP API")
                 .arg(arg!(<CONFIG> "Path to the configuration file"))
-                .arg(arg!(--"sample-now" "Fire one ingest tick immediately on startup")),
+                .arg(arg!(--"sample-now" "Capture one round of snapshots immediately on startup")),
         )
 }
 
@@ -47,18 +45,23 @@ async fn run(config_path: &str, sample_now: bool) -> Result<()> {
     let service = Service::new(&config)?;
 
     if sample_now {
-        let report = service.ingest.ingest_tick(DateTime::now()).await;
-        info!("startup --sample-now tick: {report}");
+        info!("startup --sample-now: capturing snapshots");
+        if let Err(err) = service.capture_handler.handle().await {
+            error!("startup capture failed: {err}");
+        }
     }
 
     tokio::join!(
-        service.scheduler.run(),
+        service.capture_timer.run(),
         http_server_loop(&service.http_server),
     );
     Ok(())
 }
 
-async fn http_server_loop(server: &http::Server<'_>) {
+async fn http_server_loop<H>(server: &http::Server<'_, H>)
+where
+    H: wrongint_backend::app::GetIndexSeriesHandler + Clone + Send + Sync + 'static,
+{
     loop {
         match server.run().await {
             Ok(_) => error!("http server exited without an error"),
@@ -67,10 +70,15 @@ async fn http_server_loop(server: &http::Server<'_>) {
     }
 }
 
+type CaptureHandlerImpl = CaptureSnapshotsHandler<redb::Database, redb::Database, Sources, Metrics>;
+type GetIndexSeriesHandlerImpl = GetIndexSeriesHandler<redb::Database, Metrics>;
+type CaptureTimerImpl = CaptureSnapshotsTimer<CaptureHandlerImpl>;
+type HttpServerImpl<'a> = http::Server<'a, GetIndexSeriesHandlerImpl>;
+
 struct Service<'a> {
-    http_server: http::Server<'a>,
-    scheduler: Scheduler,
-    ingest: Arc<IngestService>,
+    http_server: HttpServerImpl<'a>,
+    capture_timer: CaptureTimerImpl,
+    capture_handler: CaptureHandlerImpl,
 }
 
 impl<'a> Service<'a> {
@@ -78,37 +86,31 @@ impl<'a> Service<'a> {
         let metrics = Metrics::new()?;
         let registry = metrics.registry().clone();
 
-        let store: Arc<dyn app::Store> = Arc::new(db::Database::new(config.database_path())?);
+        let database = redb::Database::new(config.database_path())?;
 
         let client = new_client(config.user_agent(), config.request_timeout_secs())?;
-        let sources: Vec<Arc<dyn app::Source>> = vec![
-            Arc::new(HackerNews::new(client.clone(), config.hn_front_page_len())),
-            Arc::new(Lobsters::new(client.clone())),
-        ];
-
-        let metrics: Arc<dyn app::Metrics> = Arc::new(metrics);
-        let ingest = Arc::new(IngestService::new(
-            sources,
-            store.clone(),
-            metrics,
-            config.request_retries(),
-        ));
-        let query = Arc::new(QueryService::new(
-            store,
-            vec![SourceId::HackerNews, SourceId::Lobsters],
-        ));
-
-        let state = AppState::new(query, registry);
-        let http_server = http::Server::new(config, state);
-        let scheduler = Scheduler::new(
-            ingest.clone(),
-            Duration::from_secs(config.sample_interval_secs()),
+        let sources = Sources::new(
+            HackerNews::new(client.clone(), config.hn_front_page_len()),
+            Lobsters::new(client.clone()),
         );
+
+        let capture_handler = CaptureSnapshotsHandler::new(
+            database.clone(),
+            database.clone(),
+            sources,
+            metrics.clone(),
+        );
+        let get_index_series_handler =
+            GetIndexSeriesHandler::new(database.clone(), metrics.clone());
+
+        let capture_timer = CaptureSnapshotsTimer::new(capture_handler.clone());
+        let state = AppState::new(get_index_series_handler, registry);
+        let http_server = http::Server::new(config, state);
 
         Ok(Self {
             http_server,
-            scheduler,
-            ingest,
+            capture_timer,
+            capture_handler,
         })
     }
 }
