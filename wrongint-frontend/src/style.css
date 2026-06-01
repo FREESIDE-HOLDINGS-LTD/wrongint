@@ -279,15 +279,31 @@ h1 small {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  margin: 28px auto 20px;
+  margin: 140px auto 20px;
 }
 
+/* Big section banner in one uniform color, bound inline to the live index
+   readout color (green up / red down / grey flat) so GLOBAL INTERNET DRAMA
+   INDEX reads as a single identifier that tracks the global index. */
 .global-hero-label {
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 6px 16px;
+  font-weight: 800;
+  font-size: clamp(16px, 3vw, 30px);
+  line-height: 1;
+  letter-spacing: 3px;
   text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ghw {
+  color: inherit;
+  text-shadow:
+    0 0 10px currentColor,
+    0 0 26px currentColor;
 }
 
 .global-hero-num {
@@ -443,10 +459,50 @@ h1 small {
 .section-head-name {
   color: inherit;
   text-decoration: none;
+  /* inline-block so the glitch transform applies. */
+  display: inline-block;
 }
 
+/* CRT-style chromatic glitch: the name jitters and splits into red/cyan ghosts
+   while the glow flares, matching the scanline aesthetic. */
 a.section-head-name:hover {
-  text-decoration: underline;
+  animation: head-glitch 0.5s steps(2, end) infinite;
+}
+
+a.section-head-name:hover .section-head-mark {
+  animation: blink 0.4s steps(2, start) infinite;
+}
+
+@keyframes head-glitch {
+  0% {
+    transform: translateX(0);
+    text-shadow: 0 0 14px currentColor;
+  }
+  25% {
+    transform: translateX(-1.5px);
+    text-shadow:
+      -2px 0 var(--hot),
+      2px 0 #7fd2ff,
+      0 0 18px currentColor;
+  }
+  50% {
+    transform: translateX(1.5px);
+    text-shadow:
+      2px 0 var(--hot),
+      -2px 0 #7fd2ff,
+      0 0 18px currentColor;
+  }
+  75% {
+    transform: translateX(-0.5px);
+    text-shadow:
+      -1px 0 #7fd2ff,
+      1px 0 var(--hot),
+      0 0 16px currentColor;
+  }
+  100% {
+    transform: translateX(0);
+    text-shadow: 0 0 14px currentColor;
+  }
 }
 
 .section-head-mark {
@@ -973,8 +1029,14 @@ a.section-head-name:hover {
   .advance,
   .clash-core,
   .spark,
-  .bolt {
+  .bolt,
+  .contender.champion:hover,
+  a.section-head-name:hover,
+  a.section-head-name:hover .section-head-mark {
     animation: none;
+  }
+  a.section-head-name:hover {
+    text-decoration: underline;
   }
   .spark,
   .bolt {

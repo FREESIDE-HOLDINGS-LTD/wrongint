@@ -157,7 +157,12 @@ export default defineComponent({
           {{ globalValue == null ? '——' : globalValue.toFixed(0) }}
           <DirArrows :dir="globalDir" />
         </span>
-        <span class="global-hero-label">GLOBAL INTERNET DRAMA INDEX</span>
+        <span class="global-hero-label" :style="{ color: globalColor }">
+          <span class="ghw ghw-1">GLOBAL</span>
+          <span class="ghw ghw-2">INTERNET</span>
+          <span class="ghw ghw-3">DRAMA</span>
+          <span class="ghw ghw-4">INDEX</span>
+        </span>
         <span class="global-hero-sym">{{ globalSymbol }}</span>
       </div>
 
