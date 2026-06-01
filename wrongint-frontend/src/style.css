@@ -111,6 +111,7 @@ body {
 }
 
 .card {
+  position: relative;
   margin: 0 6px;
   display: flex;
   align-items: center;
@@ -191,6 +192,14 @@ body {
 }
 
 .card-cs {
+  color: var(--muted);
+}
+
+.card-date {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 10px;
   color: var(--muted);
 }
 
@@ -514,6 +523,7 @@ a.section-head-name:hover {
 }
 
 .contender {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -609,6 +619,14 @@ a.section-head-name:hover {
 .contender-cs {
   color: var(--muted);
   white-space: nowrap;
+}
+
+.contender-date {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 10px;
+  color: var(--muted);
 }
 
 /* Arrows: challengers trying to advance toward the clash. */

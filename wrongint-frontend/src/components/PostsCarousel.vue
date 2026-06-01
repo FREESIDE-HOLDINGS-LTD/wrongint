@@ -29,6 +29,26 @@ export default defineComponent({
     fmt(v: number | null): string {
       return v == null ? '——' : v.toFixed(0)
     },
+    fmtDate(iso: string): string {
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return ''
+      const secs = (d.getTime() - Date.now()) / 1000
+      const units: [Intl.RelativeTimeFormatUnit, number][] = [
+        ['year', 31536000],
+        ['month', 2592000],
+        ['day', 86400],
+        ['hour', 3600],
+        ['minute', 60],
+        ['second', 1],
+      ]
+      const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+      for (const [unit, s] of units) {
+        if (Math.abs(secs) >= s || unit === 'second') {
+          return rtf.format(Math.round(secs / s), unit)
+        }
+      }
+      return ''
+    },
     accent(p: CarouselPost): string {
       return accent(heat(p.index, this.ranges[p.source] ?? null))
     },
@@ -68,6 +88,7 @@ export default defineComponent({
           <span class="card-idx">idx {{ fmt(p.index) }}</span>
           <span class="card-cs">{{ p.comments }} comments / {{ p.score }} points</span>
         </span>
+        <span class="card-date">{{ fmtDate(p.posted_at) }}</span>
       </span>
     </a>
   </Vue3Marquee>

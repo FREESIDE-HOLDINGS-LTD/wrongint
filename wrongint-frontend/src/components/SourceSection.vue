@@ -114,6 +114,26 @@ export default defineComponent({
     fmt(v: number | null): string {
       return v == null ? '——' : v.toFixed(0)
     },
+    fmtDate(iso: string): string {
+      const d = new Date(iso)
+      if (isNaN(d.getTime())) return ''
+      const secs = (d.getTime() - Date.now()) / 1000
+      const units: [Intl.RelativeTimeFormatUnit, number][] = [
+        ['year', 31536000],
+        ['month', 2592000],
+        ['day', 86400],
+        ['hour', 3600],
+        ['minute', 60],
+        ['second', 1],
+      ]
+      const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+      for (const [unit, s] of units) {
+        if (Math.abs(secs) >= s || unit === 'second') {
+          return rtf.format(Math.round(secs / s), unit)
+        }
+      }
+      return ''
+    },
     accent(post: Post | null): string {
       return accent(heat(post?.index, this.range))
     },
@@ -173,6 +193,7 @@ export default defineComponent({
                   <span class="contender-idx">idx {{ fmt(c.post.index) }}</span>
                   <span class="contender-cs">{{ c.post.comments }} comments / {{ c.post.score }} points</span>
                 </span>
+                <span class="contender-date">{{ fmtDate(c.post.posted_at) }}</span>
               </span>
             </a>
             <span v-if="i < wiredChallengers.length - 1" class="advance advance--right" aria-hidden="true">➤</span>
@@ -196,6 +217,7 @@ export default defineComponent({
               <span class="contender-idx">idx {{ fmt(wiredChampion.post.index) }}</span>
               <span class="contender-cs">{{ wiredChampion.post.comments }} comments / {{ wiredChampion.post.score }} points</span>
             </span>
+            <span class="contender-date">{{ fmtDate(wiredChampion.post.posted_at) }}</span>
           </span>
         </a>
       </div>
@@ -232,6 +254,7 @@ export default defineComponent({
               <span class="contender-idx">idx {{ fmt(tiredChampion.post.index) }}</span>
               <span class="contender-cs">{{ tiredChampion.post.comments }} comments / {{ tiredChampion.post.score }} points</span>
             </span>
+            <span class="contender-date">{{ fmtDate(tiredChampion.post.posted_at) }}</span>
           </span>
         </a>
         <div class="ranks ranks--tired">
@@ -252,6 +275,7 @@ export default defineComponent({
                   <span class="contender-idx">idx {{ fmt(c.post.index) }}</span>
                   <span class="contender-cs">{{ c.post.comments }} comments / {{ c.post.score }} points</span>
                 </span>
+                <span class="contender-date">{{ fmtDate(c.post.posted_at) }}</span>
               </span>
             </a>
             <span v-if="i < tiredChallengers.length - 1" class="advance advance--left" aria-hidden="true">➤</span>
