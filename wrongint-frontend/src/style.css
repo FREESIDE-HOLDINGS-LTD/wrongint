@@ -1,5 +1,9 @@
 :root {
   color-scheme: dark;
+  /* Single scale lever: every dimension below is in rem, so bumping this one
+     value (e.g. to 112.5%) scales the whole UI together. 100% = browser default
+     (usually 16px), which also keeps the user's font-size preference intact. */
+  font-size: 100%;
   --bg: #05060a;
   --panel: #0b0f17;
   --neon: #39ff14;
@@ -76,15 +80,15 @@ body {
 }
 
 .tick {
-  font-size: 14px;
-  letter-spacing: 1px;
-  padding: 8px 22px;
+  font-size: 0.875rem;
+  letter-spacing: 0.0625rem;
+  padding: 0.5rem 1.375rem;
   white-space: nowrap;
 }
 
 .tick-label {
   color: var(--muted);
-  margin: 0 8px 0 18px;
+  margin: 0 0.5rem 0 1.125rem;
 }
 
 .tick-value {
@@ -100,28 +104,28 @@ body {
 
 .tick-sep {
   color: rgba(57, 255, 20, 0.4);
-  margin: 0 6px;
+  margin: 0 0.375rem;
 }
 
 /* ---- Posts carousel: a second full-width strip under the index tape ---- */
 .carousel {
   border-bottom: 1px solid rgba(57, 255, 20, 0.18);
   background: #020305;
-  padding: 8px 0;
+  padding: 0.5rem 0;
 }
 
 .card {
   position: relative;
-  margin: 0 6px;
+  margin: 0 0.375rem;
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 420px;
-  height: 92px;
+  gap: 0.625rem;
+  width: 26.25rem;
+  height: 5.75rem;
   white-space: normal;
-  padding: 8px 10px;
+  padding: 0.5rem 0.625rem;
   border: 1px solid #1f262d;
-  border-radius: 8px;
+  border-radius: 0.5rem;
   background: #0a0e14;
   text-decoration: none;
   color: var(--text);
@@ -129,7 +133,7 @@ body {
 }
 
 .card-emoji {
-  font-size: 46px;
+  font-size: 2.875rem;
   line-height: 1;
   flex: none;
 }
@@ -137,7 +141,7 @@ body {
 .card-body {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  gap: 4px;
+  gap: 0.25rem;
   min-width: 0;
   flex: 1 1 0;
 }
@@ -162,14 +166,14 @@ body {
 }
 
 .card-src {
-  font-size: 10px;
-  letter-spacing: 1px;
+  font-size: 0.625rem;
+  letter-spacing: 0.0625rem;
   color: var(--muted);
   text-transform: uppercase;
 }
 
 .card-title {
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.3;
   height: 2.6em;
   overflow: hidden;
@@ -182,7 +186,7 @@ body {
 .card-meta {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .card-idx {
@@ -197,9 +201,9 @@ body {
 
 .card-date {
   position: absolute;
-  top: 8px;
-  right: 10px;
-  font-size: 10px;
+  top: 0.5rem;
+  right: 0.625rem;
+  font-size: 0.625rem;
   color: var(--muted);
 }
 
@@ -208,30 +212,30 @@ main {
   /* Unconstrained: full-width children (the battle line) spread to the page
      edges. Reading content is wrapped in .wrap to stay in a centred column. */
   margin: 0 auto;
-  padding: 22px 16px 60px;
+  padding: 1.375rem 1rem 3.75rem;
 }
 
 /* Constraint wrapper: wrap anything that should stay in the centred reading
    column. Full-width pieces (.contention) are left outside it. Its own
    container context so .logo's cqw sizing resolves against this width. */
 .wrap {
-  max-width: 1280px;
+  max-width: 80rem;
   margin: 0 auto;
   container-type: inline-size;
 }
 
 h1 {
   font-weight: 800;
-  margin: 16px 0 24px;
+  margin: 1rem 0 1.5rem;
   text-transform: uppercase;
   text-align: center;
 }
 
 .logo {
   display: block;
-  white-space: nowrap;
-  font-size: 5.4cqw;
-  letter-spacing: 1px;
+  white-space: normal;
+  font-size: clamp(1.75rem, 5.4cqw, 4rem);
+  letter-spacing: 0.0625rem;
   color: var(--neon);
   text-shadow:
     0 0 8px var(--neon),
@@ -241,10 +245,10 @@ h1 {
 h1 small {
   display: block;
   color: var(--muted);
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 400;
-  letter-spacing: 3px;
-  margin-top: 10px;
+  letter-spacing: 0.1875rem;
+  margin-top: 0.625rem;
 }
 
 .error {
@@ -266,9 +270,9 @@ h1 small {
 .panel {
   background: var(--panel);
   border: 1px solid rgba(57, 255, 20, 0.18);
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-top: 16px;
+  border-radius: 0.625rem;
+  padding: 0.75rem 0.875rem;
+  margin-top: 1rem;
   box-shadow:
     inset 0 0 30px rgba(57, 255, 20, 0.04),
     0 0 16px rgba(0, 0, 0, 0.6);
@@ -278,8 +282,8 @@ h1 small {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  margin: 140px auto 20px;
+  gap: 0.625rem;
+  margin: 8.75rem auto 1.25rem;
 }
 
 /* Big section banner in one uniform color, bound inline to the live index
@@ -290,11 +294,11 @@ h1 small {
   flex-wrap: wrap;
   justify-content: center;
   align-items: baseline;
-  gap: 6px 16px;
+  gap: 0.375rem 1rem;
   font-weight: 800;
-  font-size: clamp(16px, 3vw, 30px);
+  font-size: clamp(1rem, 3vw, 1.875rem);
   line-height: 1;
-  letter-spacing: 3px;
+  letter-spacing: 0.1875rem;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -309,39 +313,39 @@ h1 small {
 .global-hero-num {
   display: inline-flex;
   align-items: center;
-  gap: 14px;
-  font-size: 88px;
+  gap: 0.875rem;
+  font-size: 5.5rem;
   font-weight: 800;
   line-height: 1;
-  letter-spacing: 2px;
+  letter-spacing: 0.125rem;
   color: var(--neon);
   text-shadow: 0 0 24px currentColor;
 }
 
 .global-hero-sym {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
-  letter-spacing: 3px;
+  letter-spacing: 0.1875rem;
 }
 
 .heat-legend {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  margin: 8px 0 24px;
+  gap: 0.75rem;
+  margin: 0.5rem 0 1.5rem;
 }
 
 .heat-legend-face {
-  font-size: 40px;
+  font-size: 2.5rem;
   line-height: 1;
   text-shadow: 0 0 10px currentColor;
 }
 
 .heat-legend-end {
-  font-size: 13px;
-  letter-spacing: 3px;
+  font-size: 0.8125rem;
+  letter-spacing: 0.1875rem;
   color: var(--muted);
 }
 
@@ -349,17 +353,17 @@ h1 small {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 0.375rem;
 }
 
 .chart-title {
   color: var(--muted);
-  font-size: 13px;
-  letter-spacing: 2px;
+  font-size: 0.8125rem;
+  letter-spacing: 0.125rem;
 }
 
 .chart-value {
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 800;
   color: var(--neon);
   text-shadow: 0 0 10px currentColor;
@@ -436,8 +440,8 @@ h1 small {
 }
 
 .source-section {
-  margin-top: 40px;
-  padding-top: 24px;
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
   border-top: 1px solid rgba(90, 100, 112, 0.25);
 }
 
@@ -445,13 +449,13 @@ h1 small {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 16px;
-  font-size: 30px;
+  gap: 1rem;
+  font-size: 1.875rem;
   font-weight: 800;
-  letter-spacing: 3px;
+  letter-spacing: 0.1875rem;
   text-transform: uppercase;
-  margin: 0 0 12px;
-  padding-left: 10px;
+  margin: 0 0 0.75rem;
+  padding-left: 0.625rem;
   border-left: 4px solid;
   text-shadow: 0 0 14px currentColor;
 }
@@ -506,20 +510,20 @@ a.section-head-name:hover .section-head-mark {
 }
 
 .section-head-mark {
-  margin-right: 10px;
+  margin-right: 0.625rem;
   opacity: 0.7;
 }
 
 .section-readout {
   display: inline-flex;
   align-items: baseline;
-  gap: 8px;
-  letter-spacing: 1px;
+  gap: 0.5rem;
+  letter-spacing: 0.0625rem;
   text-shadow: 0 0 12px currentColor;
 }
 
 .section-readout-sym {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   opacity: 0.75;
 }
@@ -536,26 +540,26 @@ a.section-head-name:hover .section-head-mark {
   /* Card / column widths. The central arena is the chart width; the two
      champions sit on top of it, each half its width minus a central lightning
      gap (--arena). The flanks fill the outer page margins out to the edges. */
-  --chart: min(1280px, 100vw - 32px);
-  --arena: 64px;
+  --chart: min(80rem, 100vw - 32px);
+  --arena: 4rem;
   --champ: calc((var(--chart) - var(--arena)) / 2);
-  --card: 200px;
+  --card: 12.5rem;
   /* Fixed heights so columns can be anchored: first contender centered on the
      hero, last contender's bottom flush with the chart's bottom. Tune these. */
-  --champ-h: 120px;
-  --card-h: 76px;
+  --champ-h: 7.5rem;
+  --card-h: 4.75rem;
 
   display: flex;
   align-items: stretch;
   gap: 0;
-  margin-top: 12px;
+  margin-top: 0.75rem;
   /* Full-bleed: break out of .wrap so the flanks can reach toward the page
      edges while the arena (chart + champions) stays at the capped chart width.
      Inset a little so the outer columns don't touch the screen edge. */
   width: 100vw;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
-  padding-inline: 24px;
+  padding-inline: 1.5rem;
   /* No overflow clip here: the flanks/columns clip their own cards and the body
      already hides horizontal overflow, so leaving this visible lets the hero
      glow bleed out instead of being cut off at the top edge. */
@@ -566,7 +570,7 @@ a.section-head-name:hover .section-head-mark {
 .arena {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0.75rem;
   flex: 0 0 var(--chart);
   min-width: 0;
 }
@@ -584,7 +588,7 @@ a.section-head-name:hover .section-head-mark {
 .flank {
   display: flex;
   align-items: stretch;
-  gap: 8px;
+  gap: 0.5rem;
   flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
@@ -598,7 +602,7 @@ a.section-head-name:hover .section-head-mark {
   flex-direction: column;
   align-items: stretch;
   justify-content: space-between;
-  gap: 6px;
+  gap: 0.375rem;
   flex: 1 1 0;
   min-width: 0;
   padding-top: calc(var(--champ-h) / 2 - var(--card-h) / 2);
@@ -617,12 +621,12 @@ a.section-head-name:hover .section-head-mark {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.25rem;
   flex: 0 0 var(--card);
   min-width: 0;
-  padding: 10px 12px;
+  padding: 0.625rem 0.75rem;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, #1f262d);
-  border-radius: 8px;
+  border-radius: 0.5rem;
   background: #0a0e14;
   text-decoration: none;
   color: var(--text);
@@ -640,7 +644,7 @@ a.section-head-name:hover .section-head-mark {
   height: var(--champ-h);
   flex-direction: row;
   align-items: center;
-  gap: 14px;
+  gap: 0.875rem;
   border-color: var(--accent);
   box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 50%, transparent);
 }
@@ -676,26 +680,26 @@ a.section-head-name:hover .section-head-mark {
    space-between). */
 
 .contender-emoji {
-  font-size: 56px;
+  font-size: 3.5rem;
   line-height: 1;
   flex: none;
 }
 
 .contender.champion .contender-emoji {
-  font-size: 66px;
+  font-size: 4.125rem;
 }
 
 /* Champion is tall: scale the title up so its two reserved lines fill the card
    instead of leaving a gap. (height stays 2.6em, so it tracks the font size.) */
 .contender.champion .contender-title {
-  font-size: 19px;
+  font-size: 1.1875rem;
 }
 
 /* Challengers: emoji sits inline to the left of the body, scaled down. */
 .contender:not(.champion) {
   flex-direction: row;
   align-items: center;
-  gap: 10px;
+  gap: 0.625rem;
 }
 
 /* Challengers carry a #rank label top-left, mirroring the carousel's source
@@ -715,13 +719,13 @@ a.section-head-name:hover .section-head-mark {
 }
 
 .contender-emoji--sm {
-  font-size: 40px;
+  font-size: 2.5rem;
 }
 
 .contender-body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.25rem;
   min-width: 0;
   flex: 1 1 0;
 }
@@ -731,8 +735,8 @@ a.section-head-name:hover .section-head-mark {
 }
 
 .contender-label {
-  font-size: 10px;
-  letter-spacing: 1px;
+  font-size: 0.625rem;
+  letter-spacing: 0.0625rem;
   color: var(--accent);
   font-weight: 700;
   text-transform: uppercase;
@@ -740,7 +744,7 @@ a.section-head-name:hover .section-head-mark {
 }
 
 .contender-title {
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.3;
   /* Always reserve two lines so short and long titles yield equal height. */
   height: 2.6em;
@@ -754,8 +758,8 @@ a.section-head-name:hover .section-head-mark {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 4px 10px;
-  font-size: 11px;
+  gap: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
 }
 
 .contender-idx {
@@ -771,9 +775,9 @@ a.section-head-name:hover .section-head-mark {
 
 .contender-date {
   position: absolute;
-  top: 10px;
-  right: 12px;
-  font-size: 10px;
+  top: 0.625rem;
+  right: 0.75rem;
+  font-size: 0.625rem;
   color: var(--muted);
 }
 
@@ -782,7 +786,7 @@ a.section-head-name:hover .section-head-mark {
 .advance {
   flex: 0 0 auto;
   align-self: center;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 700;
   color: #eafaff;
   text-shadow: 0 0 12px #7fd2ff, 0 0 6px #7fd2ff, 0 0 2px #ffffff;
@@ -864,24 +868,24 @@ a.section-head-name:hover .section-head-mark {
   align-self: flex-end;
   /* Level with the center of the bottom contenders. */
   margin-bottom: calc(var(--card-h) / 2 - 0.5em);
-  margin-inline: 8px;
+  margin-inline: 0.5rem;
 }
 
 .advance--hero {
   align-self: flex-start;
   /* Sit level with the hero center / first contender. */
   margin-top: calc(var(--champ-h) / 2 - 0.5em);
-  margin-inline: 8px;
+  margin-inline: 0.5rem;
 }
 
 /* Extra gap on the hero-facing side so the arrow isn't jammed against the
    champion. */
 .flank--wired .advance--hero {
-  margin-right: 24px;
+  margin-right: 1.5rem;
 }
 
 .flank--tired .advance--hero {
-  margin-left: 24px;
+  margin-left: 1.5rem;
 }
 
 /* The clash arena: spans the gap between the champions (which sit on the chart
@@ -896,7 +900,7 @@ a.section-head-name:hover .section-head-mark {
 }
 
 .clash-core {
-  font-size: 26px;
+  font-size: 1.625rem;
   color: #fff3b0;
   text-shadow:
     0 0 8px var(--neon),
@@ -920,7 +924,7 @@ a.section-head-name:hover .section-head-mark {
   position: absolute;
   top: 50%;
   left: 50%;
-  font-size: 20px;
+  font-size: 1.25rem;
   color: #cfe9ff;
   text-shadow:
     0 0 6px #7fd2ff,
@@ -937,7 +941,7 @@ a.section-head-name:hover .section-head-mark {
 .bolt--2 {
   transform: translate(-50%, -50%) rotate(16deg) scaleX(-1);
   animation-delay: 0.28s;
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 @keyframes bolt-arc {
@@ -955,7 +959,7 @@ a.section-head-name:hover .section-head-mark {
   position: absolute;
   top: 50%;
   left: 50%;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #ffd166;
   text-shadow: 0 0 6px var(--hot);
   opacity: 0;
@@ -991,56 +995,6 @@ a.section-head-name:hover .section-head-mark {
   100% {
     opacity: 0;
     transform: translate(calc(-50% + var(--sx)), calc(-50% + var(--sy))) scale(1);
-  }
-}
-
-@media (max-width: 720px) {
-  /* No room for the flanking columns. Drop them and stack the two champions
-     one below the other above the chart, the clash arena between them. */
-  .battle {
-    /* Full-bleed strip spans 100vw; pad so the arena doesn't touch the edges. */
-    padding: 0 16px;
-  }
-  .flank {
-    display: none;
-  }
-  .arena {
-    flex: 1 1 auto;
-  }
-  .champions {
-    flex-direction: column;
-  }
-  .contender.champion {
-    flex: 1 1 auto;
-    width: 100%;
-  }
-  .contender-emoji {
-    font-size: 40px;
-  }
-  /* Logo is nowrap + cqw on desktop (one shrinking line). On mobile let it wrap
-     onto several lines at a fixed readable size instead of going tiny. */
-  .logo {
-    white-space: normal;
-    font-size: 28px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .advance,
-  .clash-core,
-  .spark,
-  .bolt,
-  .contender.champion:hover,
-  a.section-head-name:hover,
-  a.section-head-name:hover .section-head-mark {
-    animation: none;
-  }
-  a.section-head-name:hover {
-    text-decoration: underline;
-  }
-  .spark,
-  .bolt {
-    opacity: 0.6;
   }
 }
 
