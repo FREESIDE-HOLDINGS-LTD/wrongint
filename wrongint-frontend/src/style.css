@@ -473,53 +473,83 @@ a.section-head-name:hover {
   font-weight: 800;
 }
 
-/* ---- Contention: a battle line. The most WIRED and most TIRED posts march
-   toward the centre and clash; challengers queue up behind each champion,
-   arrows pointing toward the fight, ranks fading out toward the edges. ---- */
-.contention {
-  /* Card / column widths. The two champions are wide: together they span the
-     chart width, each filling half of it minus a small central lightning gap
-     (--arena), so their outer edges land on the chart's left/right edges.
-     Smaller challenger cards fill the outer page margins out to the edges. */
+/* ---- Battle line: the most WIRED and most TIRED posts clash on top of the
+   chart; challenger columns flank the central arena and run its full height,
+   snaking toward the champions, ranks fading out toward the page edges. ---- */
+.battle {
+  /* Card / column widths. The central arena is the chart width; the two
+     champions sit on top of it, each half its width minus a central lightning
+     gap (--arena). The flanks fill the outer page margins out to the edges. */
   --chart: min(1280px, 100vw - 32px);
   --arena: 64px;
   --champ: calc((var(--chart) - var(--arena)) / 2);
   --card: 200px;
+  /* Fixed heights so columns can be anchored: first contender centered on the
+     hero, last contender's bottom flush with the chart's bottom. Tune these. */
+  --champ-h: 120px;
+  --card-h: 76px;
 
   display: flex;
   align-items: stretch;
   gap: 0;
   margin-top: 12px;
-  /* Full-bleed: break out of .wrap so challengers can reach the page edges
-     while the champions stay pinned to the (capped) chart edges. */
+  /* Full-bleed: break out of .wrap so the flanks can reach the page edges
+     while the arena (chart + champions) stays at the capped chart width. */
   width: 100vw;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
   overflow: hidden;
 }
 
-.team {
+/* Central column: champions row stacked on top of the chart, at chart width. */
+.arena {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1 1 0;
+  flex-direction: column;
+  gap: 12px;
+  flex: 0 0 var(--chart);
   min-width: 0;
 }
 
-/* Challengers live here, filling the outer page margin. flex:1 absorbs the
-   variable margin width so the champion (fixed) always pins to the chart edge. */
-.ranks {
+/* The two champions + clash, spanning the chart width. */
+.champions {
   display: flex;
-  align-items: center;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+}
+
+/* A flank holds the two snaking columns, filling the outer page margin. flex:1
+   absorbs the variable margin width so the arena stays pinned at chart width. */
+.flank {
+  display: flex;
+  align-items: stretch;
   gap: 8px;
   flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
 }
 
-/* Challengers stretch to share the outer margin instead of staying narrow. */
-.ranks .contender {
+/* One snaking column of challenger cards. Offset down by half the champion so
+   the first contender centers on the hero; space-between then carries the last
+   contender's bottom down to the chart's bottom. */
+.column {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 6px;
   flex: 1 1 0;
+  min-width: 0;
+  padding-top: calc(var(--champ-h) / 2 - var(--card-h) / 2);
+  overflow: hidden;
+}
+
+/* In a column, cards share the column width and take a fixed height so the
+   snake aligns deterministically (first card centers on the hero, last card's
+   bottom lands on the chart's bottom). */
+.flank .contender {
+  flex: 0 0 var(--card-h);
+  height: var(--card-h);
 }
 
 .contender {
@@ -546,6 +576,7 @@ a.section-head-name:hover {
    the chart edge, brighter, emoji + text side by side. */
 .contender.champion {
   flex: 0 0 var(--champ);
+  height: var(--champ-h);
   flex-direction: row;
   align-items: center;
   gap: 14px;
@@ -629,23 +660,64 @@ a.section-head-name:hover {
   color: var(--muted);
 }
 
-/* Arrows: challengers trying to advance toward the clash. */
+/* Arrows: challengers advancing along the snake toward the champion. Inner
+   column flows up, outer column flows down toward the fold. */
 .advance {
   flex: 0 0 auto;
   align-self: center;
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 700;
   color: #eafaff;
   text-shadow: 0 0 12px #7fd2ff, 0 0 6px #7fd2ff, 0 0 2px #ffffff;
   opacity: 1;
-  animation: advance-pulse 1.2s ease-in-out infinite;
+}
+
+.advance--up {
+  transform: rotate(-90deg);
+  animation: advance-pulse-up 1.2s ease-in-out infinite;
+}
+
+.advance--down {
+  transform: rotate(90deg);
+  animation: advance-pulse-down 1.2s ease-in-out infinite;
+}
+
+@keyframes advance-pulse-up {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: rotate(-90deg) translateX(0);
+  }
+  50% {
+    opacity: 1;
+    transform: rotate(-90deg) translateX(3px);
+  }
+}
+
+@keyframes advance-pulse-down {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: rotate(90deg) translateX(0);
+  }
+  50% {
+    opacity: 1;
+    transform: rotate(90deg) translateX(3px);
+  }
+}
+
+/* Horizontal connectors: the fold (outer -> inner, at the bottom) and the
+   charge into the champion (inner top contender -> hero). */
+.advance--right {
+  animation: advance-pulse-right 1.2s ease-in-out infinite;
 }
 
 .advance--left {
   transform: scaleX(-1);
+  animation: advance-pulse-left 1.2s ease-in-out infinite;
 }
 
-@keyframes advance-pulse {
+@keyframes advance-pulse-right {
   0%,
   100% {
     opacity: 0.6;
@@ -655,10 +727,6 @@ a.section-head-name:hover {
     opacity: 1;
     transform: translateX(3px);
   }
-}
-
-.advance--left {
-  animation-name: advance-pulse-left;
 }
 
 @keyframes advance-pulse-left {
@@ -671,6 +739,23 @@ a.section-head-name:hover {
     opacity: 1;
     transform: scaleX(-1) translateX(3px);
   }
+}
+
+/* The fold sits at the bottom (where the two columns hand off); the hero charge
+   sits at the top, level with the first contender + champion. */
+.advance--fold {
+  align-self: flex-end;
+  /* Level with the center of the bottom contenders. */
+  margin-bottom: calc(var(--card-h) / 2 - 0.5em);
+  margin-inline: 8px;
+}
+
+.advance--hero {
+  align-self: flex-start;
+  /* Sit level with the hero center / first contender, with breathing room on
+     each side so it lands in the gap between the contender and the champion. */
+  margin-top: calc(var(--champ-h) / 2 - 0.5em);
+  margin-inline: 8px;
 }
 
 /* The clash arena: spans the gap between the champions (which sit on the chart
@@ -784,18 +869,20 @@ a.section-head-name:hover {
 }
 
 @media (max-width: 720px) {
-  /* No room for the full battle line. Drop the challenger ranks and stack the
-     two champions one below the other, the clash arena between them. */
-  .contention {
-    flex-direction: column;
-    /* Full-bleed strip spans 100vw; pad so champions don't touch the edges. */
+  /* No room for the flanking columns. Drop them and stack the two champions
+     one below the other above the chart, the clash arena between them. */
+  .battle {
+    /* Full-bleed strip spans 100vw; pad so the arena doesn't touch the edges. */
     padding: 0 16px;
   }
-  .ranks {
+  .flank {
     display: none;
   }
-  .team {
-    width: 100%;
+  .arena {
+    flex: 1 1 auto;
+  }
+  .champions {
+    flex-direction: column;
   }
   .contender.champion {
     flex: 1 1 auto;
