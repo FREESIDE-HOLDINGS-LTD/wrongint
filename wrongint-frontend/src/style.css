@@ -1041,7 +1041,7 @@ a.section-head-name:hover .section-head-mark {
   width: 100%;
   /* Cap to the scope width so the clickable area hugs the visual, not the whole
      flank's empty margin. */
-  max-width: 24rem;
+  max-width: 20rem;
   color: var(--muted);
   text-decoration: none;
 }
@@ -1054,7 +1054,7 @@ a.radar {
   position: relative;
   width: 100%;
   /* Fill the flank up to a cap that stays roughly the graph's height. */
-  max-width: 24rem;
+  max-width: 20rem;
   aspect-ratio: 1;
   border-radius: 50%;
   border: 1px solid rgba(57, 255, 20, 0.4);
