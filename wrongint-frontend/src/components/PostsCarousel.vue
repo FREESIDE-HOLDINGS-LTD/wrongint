@@ -4,6 +4,7 @@ import { Vue3Marquee } from 'vue3-marquee'
 import PostCard from './PostCard.vue'
 import { sourceLabel, type Post } from '../api'
 import { rangeOf, heat, accent, isHot, emoji, type Range } from '../heat'
+import { slow, resume } from '../marquee-hover'
 
 export interface CarouselPost extends Post {
   source: string
@@ -26,6 +27,8 @@ export default defineComponent({
     },
   },
   methods: {
+    slow,
+    resume,
     sourceLabel,
     accent(p: CarouselPost): string {
       return accent(heat(p.index, this.ranges[p.source] ?? null))
@@ -46,7 +49,8 @@ export default defineComponent({
     class="carousel"
     :duration="120"
     :clone="true"
-    :pause-on-hover="true"
+    @mouseenter="slow"
+    @mouseleave="resume"
   >
     <PostCard
       v-for="p in posts"

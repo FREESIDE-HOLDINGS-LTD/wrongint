@@ -3,6 +3,7 @@ import { defineComponent, type PropType } from 'vue'
 import { Vue3Marquee } from 'vue3-marquee'
 import DirArrows from './DirArrows.vue'
 import { indexSymbol, sourceColors } from '../api'
+import { slow, resume } from '../marquee-hover'
 
 export interface TickerItem {
   source: string
@@ -17,6 +18,8 @@ export default defineComponent({
     items: { type: Array as PropType<TickerItem[]>, default: () => [] },
   },
   methods: {
+    slow,
+    resume,
     indexSymbol,
     fmt(v: number | null): string {
       return v == null ? '——' : v.toFixed(0)
@@ -31,7 +34,13 @@ export default defineComponent({
 </script>
 
 <template>
-  <Vue3Marquee class="ticker" :duration="2" :clone="true" :pause-on-hover="true">
+  <Vue3Marquee
+    class="ticker"
+    :duration="2"
+    :clone="true"
+    @mouseenter="slow"
+    @mouseleave="resume"
+  >
     <span v-for="it in items" :key="it.source" class="tick">
       <span class="tick-label">{{ indexSymbol(it.source) }}</span>
       <span

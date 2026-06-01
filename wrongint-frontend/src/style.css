@@ -500,7 +500,10 @@ a.section-head-name:hover {
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
   padding-inline: 24px;
-  overflow: hidden;
+  /* No overflow clip here: the flanks/columns clip their own cards and the body
+     already hides horizontal overflow, so leaving this visible lets the hero
+     glow bleed out instead of being cut off at the top edge. */
+  overflow: visible;
 }
 
 /* Central column: champions row stacked on top of the chart, at chart width. */
@@ -584,6 +587,25 @@ a.section-head-name:hover {
   gap: 14px;
   border-color: var(--accent);
   box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+/* Heroes are the headline act — on hover, pulse the accent glow in and out. */
+.contender.champion:hover {
+  border-color: var(--accent);
+  animation: hero-glow 1.1s ease-in-out infinite;
+  z-index: 2;
+}
+
+@keyframes hero-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 34px color-mix(in srgb, var(--accent) 90%, transparent),
+      0 0 10px var(--accent);
+  }
 }
 
 /* Emoji stays vertically centered, but the text block fills the card height and
