@@ -493,11 +493,13 @@ a.section-head-name:hover {
   align-items: stretch;
   gap: 0;
   margin-top: 12px;
-  /* Full-bleed: break out of .wrap so the flanks can reach the page edges
-     while the arena (chart + champions) stays at the capped chart width. */
+  /* Full-bleed: break out of .wrap so the flanks can reach toward the page
+     edges while the arena (chart + champions) stays at the capped chart width.
+     Inset a little so the outer columns don't touch the screen edge. */
   width: 100vw;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
+  padding-inline: 24px;
   overflow: hidden;
 }
 
@@ -752,10 +754,19 @@ a.section-head-name:hover {
 
 .advance--hero {
   align-self: flex-start;
-  /* Sit level with the hero center / first contender, with breathing room on
-     each side so it lands in the gap between the contender and the champion. */
+  /* Sit level with the hero center / first contender. */
   margin-top: calc(var(--champ-h) / 2 - 0.5em);
   margin-inline: 8px;
+}
+
+/* Extra gap on the hero-facing side so the arrow isn't jammed against the
+   champion. */
+.flank--wired .advance--hero {
+  margin-right: 24px;
+}
+
+.flank--tired .advance--hero {
+  margin-left: 24px;
 }
 
 /* The clash arena: spans the gap between the champions (which sit on the chart
