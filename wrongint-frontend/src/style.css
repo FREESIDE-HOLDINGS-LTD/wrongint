@@ -274,23 +274,6 @@ h1 small {
   }
 }
 
-/* Shared centered column (--col): the section graph (arena) is half the
-   full-bleed battle width and is centered on the viewport via the full-bleed
-   trick. Match the top/global graph and the section headers to the same width
-   and centering so all three line up.
-   margin:auto can't be used — on wide screens --col exceeds the 1280px .wrap
-   cap, where auto collapses to 0 and left-pins the element. Center explicitly
-   off the parent's own centered position instead: parent is centered on the
-   viewport, so left = 50%(parent) - col/2 puts the element's center on the
-   viewport center regardless of how wide --col gets.
-   (.wrap > .panel targets only the global chart; section charts nest deeper.) */
-.wrap > .panel,
-.section-head {
-  width: var(--col);
-  margin-left: calc(50% - var(--col) / 2);
-  margin-right: 0;
-}
-
 /* ---- Panels / charts ---- */
 .panel {
   background: var(--panel);
@@ -479,8 +462,7 @@ h1 small {
   font-weight: 800;
   letter-spacing: 0.1875rem;
   text-transform: uppercase;
-  /* auto L/R: centered to the half-viewport column (width set above). */
-  margin: 0 auto 0.75rem;
+  margin: 0 0 0.75rem;
   padding-left: 0.625rem;
   border-left: 4px solid;
   text-shadow: 0 0 14px currentColor;
