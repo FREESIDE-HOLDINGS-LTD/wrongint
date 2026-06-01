@@ -1,15 +1,19 @@
 :root {
   color-scheme: dark;
-  /* Single scale lever: every dimension below is in rem, so bumping this one
-     value (e.g. to 112.5%) scales the whole UI together. 100% = browser default
-     (usually 16px), which also keeps the user's font-size preference intact. */
-  font-size: 100%;
+  /* Fluid scale lever: every dimension below is in rem, so the whole UI scales
+     continuously with viewport width. ~16px at >=2000px wide, ramping down to a
+     10px floor on narrow screens. No breakpoints, no jumps. */
+  font-size: clamp(10px, 0.5vw + 6px, 16px);
   --bg: #05060a;
   --panel: #0b0f17;
   --neon: #39ff14;
   --text: #d7ffe0;
   --muted: #5a6470;
   --hot: #ff2e63;
+  /* Centered half-viewport column shared by the graphs and section headers.
+     Equals the arena width: 50% of the full-bleed battle (100vw minus its
+     2 x 1.5rem padding-inline). */
+  --col: calc((100vw - 3rem) / 2);
 }
 
 * {
@@ -218,8 +222,12 @@ main {
 /* Constraint wrapper: wrap anything that should stay in the centred reading
    column. Full-width pieces (.contention) are left outside it. Its own
    container context so .logo's cqw sizing resolves against this width. */
+/* The reading column IS the shared centered column (--col). Headers and the top
+   graph fill it directly; the battle breaks out of it full-bleed so the flanks
+   can reach the page edges, and the arena's 50% width equals --col again — so
+   every graph + header lines up without per-element math. */
 .wrap {
-  max-width: 80rem;
+  width: var(--col);
   margin: 0 auto;
   container-type: inline-size;
 }
@@ -264,6 +272,23 @@ h1 small {
   to {
     visibility: hidden;
   }
+}
+
+/* Shared centered column (--col): the section graph (arena) is half the
+   full-bleed battle width and is centered on the viewport via the full-bleed
+   trick. Match the top/global graph and the section headers to the same width
+   and centering so all three line up.
+   margin:auto can't be used — on wide screens --col exceeds the 1280px .wrap
+   cap, where auto collapses to 0 and left-pins the element. Center explicitly
+   off the parent's own centered position instead: parent is centered on the
+   viewport, so left = 50%(parent) - col/2 puts the element's center on the
+   viewport center regardless of how wide --col gets.
+   (.wrap > .panel targets only the global chart; section charts nest deeper.) */
+.wrap > .panel,
+.section-head {
+  width: var(--col);
+  margin-left: calc(50% - var(--col) / 2);
+  margin-right: 0;
 }
 
 /* ---- Panels / charts ---- */
@@ -454,7 +479,8 @@ h1 small {
   font-weight: 800;
   letter-spacing: 0.1875rem;
   text-transform: uppercase;
-  margin: 0 0 0.75rem;
+  /* auto L/R: centered to the half-viewport column (width set above). */
+  margin: 0 auto 0.75rem;
   padding-left: 0.625rem;
   border-left: 4px solid;
   text-shadow: 0 0 14px currentColor;
@@ -540,7 +566,7 @@ a.section-head-name:hover .section-head-mark {
   /* Card / column widths. The central arena is the chart width; the two
      champions sit on top of it, each half its width minus a central lightning
      gap (--arena). The flanks fill the outer page margins out to the edges. */
-  --chart: min(80rem, 100vw - 32px);
+  --chart: min(1280px, 100vw - 32px);
   --arena: 4rem;
   --champ: calc((var(--chart) - var(--arena)) / 2);
   --card: 12.5rem;
@@ -571,7 +597,8 @@ a.section-head-name:hover .section-head-mark {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  flex: 0 0 var(--chart);
+  /* Graph is always half the battle row; the two flanks split the other half. */
+  flex: 0 0 50%;
   min-width: 0;
 }
 
@@ -637,10 +664,10 @@ a.section-head-name:hover .section-head-mark {
   animation: card-pulse 0.9s steps(1) infinite;
 }
 
-/* Champions are the ones actually fighting: wide (half the chart), pinned to
-   the chart edge, brighter, emoji + text side by side. */
+/* Champions are the ones actually fighting: each fills half the (50%-wide)
+   arena, minus the central clash gap. Brighter, emoji + text side by side. */
 .contender.champion {
-  flex: 0 0 var(--champ);
+  flex: 1 1 0;
   height: var(--champ-h);
   flex-direction: row;
   align-items: center;
