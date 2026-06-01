@@ -1007,6 +1007,196 @@ a.section-head-name:hover .section-head-mark {
   }
 }
 
+/* ---- Global graph row: graph centered at --col, blorp radar in the left
+   margin. Full-bleed like .battle so the flanks fill the page margins while the
+   graph stays the same centered column as every other graph/header. ---- */
+.global-battle {
+  display: flex;
+  align-items: center;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  padding-inline: 1.5rem;
+}
+
+.global-arena {
+  flex: 0 0 var(--col);
+  min-width: 0;
+}
+
+/* flank--radar centers the scope; the empty right flank balances it so the
+   arena stays centered. (.flank base supplies flex: 1 1 0.) */
+.flank--radar {
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+/* ---- Blorp radar ---- */
+.radar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  /* Cap to the scope width so the clickable area hugs the visual, not the whole
+     flank's empty margin. */
+  max-width: 24rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+a.radar {
+  cursor: pointer;
+}
+
+.radar-scope {
+  position: relative;
+  width: 100%;
+  /* Fill the flank up to a cap that stays roughly the graph's height. */
+  max-width: 24rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(57, 255, 20, 0.4);
+  background: radial-gradient(circle at center, rgba(57, 255, 20, 0.08), #02060a 72%);
+  box-shadow:
+    inset 0 0 24px rgba(57, 255, 20, 0.12),
+    0 0 16px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+/* Concentric range rings + crosshair. */
+.radar-grid {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle at center,
+    transparent 0,
+    transparent calc(25% - 1px),
+    rgba(57, 255, 20, 0.18) 25%
+  );
+}
+
+.radar-grid::before,
+.radar-grid::after {
+  content: '';
+  position: absolute;
+  background: rgba(57, 255, 20, 0.18);
+}
+
+.radar-grid::before {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+
+.radar-grid::after {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+/* The rotating beam: a faint wedge that brightens at its leading edge. */
+.radar-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(57, 255, 20, 0) 0deg,
+    rgba(57, 255, 20, 0) 300deg,
+    rgba(57, 255, 20, 0.12) 350deg,
+    rgba(57, 255, 20, 0.55) 360deg
+  );
+  animation: radar-spin 3s linear infinite;
+}
+
+@keyframes radar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Contact blip — a pulsing dot off-center, only shown when blorp is detected. */
+.radar-blip {
+  position: absolute;
+  top: 32%;
+  left: 63%;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--neon);
+  box-shadow: 0 0 8px var(--neon), 0 0 16px var(--neon);
+  animation: radar-blip 3s ease-out infinite;
+}
+
+/* Blip flares once per sweep pass, then fades — as if repainted by the beam. */
+@keyframes radar-blip {
+  0% {
+    opacity: 1;
+    transform: scale(1.4);
+  }
+  40% {
+    opacity: 0.15;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 0.15;
+    transform: scale(0.9);
+  }
+}
+
+.radar-readout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  text-align: center;
+  width: 100%;
+}
+
+.radar-label {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: 0.0625rem;
+  color: var(--neon);
+  text-shadow: 0 0 8px currentColor;
+}
+
+/* Live "time since" counter — the radar's headline number. */
+.radar-since {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: 0.0625rem;
+  color: var(--neon);
+  text-shadow: 0 0 12px currentColor;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hover: glitch the readout text with the same CRT chromatic split used by the
+   section headers. inline-block so the jitter transform applies. */
+a.radar:hover .radar-label,
+a.radar:hover .radar-since {
+  display: inline-block;
+  animation: head-glitch 0.45s steps(2, end) infinite;
+}
+
+.radar-status {
+  font-size: 0.75rem;
+  letter-spacing: 0.125rem;
+  font-weight: 700;
+  color: var(--neon);
+  text-shadow: 0 0 6px currentColor;
+}
+
+.radar-status--idle {
+  color: var(--muted);
+  text-shadow: none;
+}
+
 /* uPlot dark tweaks */
 .u-legend {
   color: var(--muted);

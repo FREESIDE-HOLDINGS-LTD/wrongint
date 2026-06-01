@@ -90,6 +90,17 @@ export async function fetchSnapshot(source: SourceOnly): Promise<Snapshot> {
   return (await res.json()) as Snapshot
 }
 
+// Most recent post whose title contains `q` (case-insensitive), across all
+// captured snapshots. 404 (no match) resolves to null rather than throwing.
+export async function searchLatestPost(q: string): Promise<Post | null> {
+  const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`)
+  if (res.status === 404) return null
+  if (!res.ok) {
+    throw new Error(`GET /api/search -> ${res.status}`)
+  }
+  return (await res.json()) as Post
+}
+
 // Global lives at /api/index; each source at /api/index/<source>.
 export async function fetchIndexCandles(
   source: IndexSource,

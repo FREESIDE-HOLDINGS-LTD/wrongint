@@ -1,10 +1,11 @@
 pub mod capture_snapshots;
 pub mod get_index_series;
 pub mod get_snapshot;
+pub mod search_posts;
 pub mod update_metrics;
 
 use crate::domain::time::{DateTime, Duration};
-use crate::domain::{IndexOverTime, Snapshot, SnapshotIndex, Source, SourceId};
+use crate::domain::{IndexOverTime, Post, Snapshot, SnapshotIndex, Source, SourceId};
 use crate::errors::Result;
 use async_trait::async_trait;
 
@@ -26,6 +27,13 @@ pub trait UpdateMetricsHandler {
 #[async_trait]
 pub trait GetSnapshotHandler: Send + Sync {
     async fn handle(&self, source: SourceId) -> Result<Option<Snapshot>>;
+}
+
+#[async_trait]
+pub trait SearchPostsHandler: Send + Sync {
+    /// Most recent post (by `posted_at`) across all captured snapshots whose
+    /// title contains `query` (case-insensitive). `None` if nothing matches.
+    async fn handle(&self, query: &str) -> Result<Option<Post>>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -5,9 +5,11 @@ import Ticker, { type TickerItem } from './components/Ticker.vue'
 import PostsCarousel, { type CarouselPost } from './components/PostsCarousel.vue'
 import SourceSection from './components/SourceSection.vue'
 import DirArrows from './components/DirArrows.vue'
+import BlorpDetector from './components/BlorpDetector.vue'
 import {
   fetchIndexCandles,
   fetchSnapshot,
+  searchLatestPost,
   indexSymbol,
   sourceColors,
   type IndexCandles,
@@ -23,6 +25,7 @@ interface State {
   hnPosts: Post[]
   lobPosts: Post[]
   posts: CarouselPost[]
+  blorp: Post | null
   error: string | null
   timer?: ReturnType<typeof setInterval>
 }
@@ -48,7 +51,7 @@ function dirOf(candles: IndexCandles | null): number {
 
 export default defineComponent({
   name: 'App',
-  components: { IndexChart, Ticker, PostsCarousel, SourceSection, DirArrows },
+  components: { IndexChart, Ticker, PostsCarousel, SourceSection, DirArrows, BlorpDetector },
   data(): State {
     return {
       global: null,
@@ -57,6 +60,7 @@ export default defineComponent({
       hnPosts: [],
       lobPosts: [],
       posts: [],
+      blorp: null,
       error: null,
       timer: undefined,
     }
@@ -94,18 +98,20 @@ export default defineComponent({
   methods: {
     async load() {
       try {
-        const [global, hackernews, lobsters, hnSnap, lobSnap] = await Promise.all([
+        const [global, hackernews, lobsters, hnSnap, lobSnap, blorp] = await Promise.all([
           fetchIndexCandles('all'),
           fetchIndexCandles('hackernews'),
           fetchIndexCandles('lobsters'),
           fetchSnapshot('hackernews').catch(() => null),
           fetchSnapshot('lobsters').catch(() => null),
+          searchLatestPost('blorp').catch(() => null),
         ])
         this.global = global
         this.hackernews = hackernews
         this.lobsters = lobsters
         this.hnPosts = hnSnap?.posts ?? []
         this.lobPosts = lobSnap?.posts ?? []
+        this.blorp = blorp
 
         // Deterministically interleave the sources so they read mixed, not
         // clustered. Must be stable across refreshes: a random shuffle every
@@ -166,7 +172,17 @@ export default defineComponent({
         <span class="global-hero-sym">{{ globalSymbol }}</span>
       </div>
 
-      <IndexChart source="all" :candles="global" :height="340" :head="false" />
+      <!-- Global graph with the blorp radar in the left margin. Full-bleed row:
+           the graph stays the centered --col, flanks fill the margins. -->
+      <div class="global-battle">
+        <div class="flank flank--radar">
+          <BlorpDetector :post="blorp" />
+        </div>
+        <div class="global-arena">
+          <IndexChart source="all" :candles="global" :height="340" :head="false" />
+        </div>
+        <div class="flank"></div>
+      </div>
 
       <SourceSection source="hackernews" :candles="hackernews" :posts="hnPosts" />
       <SourceSection source="lobsters" :candles="lobsters" :posts="lobPosts" />

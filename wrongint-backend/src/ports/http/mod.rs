@@ -63,8 +63,9 @@ Timestamps are ISO-8601 / RFC-3339 in UTC. Ranges default to the last 7 days."
     tags(
         (name = "index", description = "Hourly OHLC index candles."),
         (name = "snapshot", description = "Captured front-page snapshots."),
+        (name = "search", description = "Full-text search across captured posts."),
     ),
-    paths(handle_index_global, handle_index_source, handle_snapshot),
+    paths(handle_index_global, handle_index_source, handle_snapshot, handle_search),
     components(schemas(ApiGlobalIndex, ApiSourceIndex, ApiIndexCandle, ApiSnapshot, ApiPost, ApiErrorBody))
 )]
 struct ApiDoc;
@@ -72,33 +73,36 @@ struct ApiDoc;
 const DEFAULT_RANGE_DAYS: u64 = 7;
 
 #[derive(Clone)]
-pub struct AppState<H, S> {
+pub struct AppState<H, S, P> {
     index_series: H,
     snapshots: S,
+    search: P,
     registry: Registry,
 }
 
-impl<H, S> AppState<H, S> {
-    pub fn new(index_series: H, snapshots: S, registry: Registry) -> Self {
+impl<H, S, P> AppState<H, S, P> {
+    pub fn new(index_series: H, snapshots: S, search: P, registry: Registry) -> Self {
         Self {
             index_series,
             snapshots,
+            search,
             registry,
         }
     }
 }
 
-pub struct Server<'a, H, S> {
+pub struct Server<'a, H, S, P> {
     config: &'a Config,
-    state: AppState<H, S>,
+    state: AppState<H, S, P>,
 }
 
-impl<'a, H, S> Server<'a, H, S>
+impl<'a, H, S, P> Server<'a, H, S, P>
 where
     H: app::GetIndexSeriesHandler + Clone + Send + Sync + 'static,
     S: app::GetSnapshotHandler + Clone + Send + Sync + 'static,
+    P: app::SearchPostsHandler + Clone + Send + Sync + 'static,
 {
-    pub fn new(config: &'a Config, state: AppState<H, S>) -> Self {
+    pub fn new(config: &'a Config, state: AppState<H, S, P>) -> Self {
         Self { config, state }
     }
 
@@ -109,10 +113,11 @@ where
             .allow_headers(Any);
 
         let router = Router::new()
-            .route("/api/index", get(handle_index_global::<H, S>))
-            .route("/api/index/{source}", get(handle_index_source::<H, S>))
-            .route("/api/snapshot/{source}", get(handle_snapshot::<H, S>))
-            .route("/metrics", get(handle_metrics::<H, S>))
+            .route("/api/index", get(handle_index_global::<H, S, P>))
+            .route("/api/index/{source}", get(handle_index_source::<H, S, P>))
+            .route("/api/snapshot/{source}", get(handle_snapshot::<H, S, P>))
+            .route("/api/search", get(handle_search::<H, S, P>))
+            .route("/metrics", get(handle_metrics::<H, S, P>))
             .route("/api/openapi.yml", get(handle_openapi_yaml))
             .merge(Redoc::with_url("/api", ApiDoc::openapi()))
             .layer(TraceLayer::new_for_http())
@@ -147,8 +152,8 @@ are omitted. Candles are sorted oldest-first. Defaults to the last 7 days when f
         (status = 500, description = "Unexpected server error", body = ApiErrorBody),
     )
 )]
-async fn handle_index_global<H, S>(
-    State(state): State<AppState<H, S>>,
+async fn handle_index_global<H, S, P>(
+    State(state): State<AppState<H, S, P>>,
     Query(range): Query<IndexRange>,
 ) -> std::result::Result<Json<ApiGlobalIndex>, ApiError>
 where
@@ -176,8 +181,8 @@ where
         (status = 500, description = "Unexpected server error", body = ApiErrorBody),
     )
 )]
-async fn handle_index_source<H, S>(
-    State(state): State<AppState<H, S>>,
+async fn handle_index_source<H, S, P>(
+    State(state): State<AppState<H, S, P>>,
     Path(source): Path<String>,
     Query(range): Query<IndexRange>,
 ) -> std::result::Result<Json<ApiSourceIndex>, ApiError>
@@ -210,8 +215,8 @@ where
         (status = 500, description = "Unexpected server error", body = ApiErrorBody),
     )
 )]
-async fn handle_snapshot<H, S>(
-    State(state): State<AppState<H, S>>,
+async fn handle_snapshot<H, S, P>(
+    State(state): State<AppState<H, S, P>>,
     Path(source): Path<String>,
 ) -> std::result::Result<Json<ApiSnapshot>, ApiError>
 where
@@ -224,8 +229,41 @@ where
     }
 }
 
-async fn index<H, S>(
-    state: &AppState<H, S>,
+#[utoipa::path(
+    get,
+    path = "/api/search",
+    tag = "search",
+    operation_id = "search_posts",
+    summary = "Most recent post matching a query",
+    description = "Scans every captured snapshot (all sources, full history) and returns the most \
+recently posted post whose title contains `q` (case-insensitive substring). 404 if nothing matches.",
+    params(SearchQuery),
+    responses(
+        (status = 200, description = "The most recent matching post", body = ApiPost),
+        (status = 400, description = "Missing or empty `q`", body = ApiErrorBody),
+        (status = 404, description = "No post matches the query", body = ApiErrorBody),
+        (status = 500, description = "Unexpected server error", body = ApiErrorBody),
+    )
+)]
+async fn handle_search<H, S, P>(
+    State(state): State<AppState<H, S, P>>,
+    Query(query): Query<SearchQuery>,
+) -> std::result::Result<Json<ApiPost>, ApiError>
+where
+    P: app::SearchPostsHandler,
+{
+    let q = query.q.trim();
+    if q.is_empty() {
+        return Err(ApiError::BadRequest("'q' must not be empty".into()));
+    }
+    match state.search.handle(q).await? {
+        Some(post) => Ok(Json(ApiPost::from(&post))),
+        None => Err(ApiError::NotFound),
+    }
+}
+
+async fn index<H, S, P>(
+    state: &AppState<H, S, P>,
     scope: IndexScope,
     range: &IndexRange,
 ) -> std::result::Result<Vec<ApiIndexCandle>, ApiError>
@@ -257,8 +295,8 @@ where
         .collect())
 }
 
-async fn handle_metrics<H, S>(
-    State(state): State<AppState<H, S>>,
+async fn handle_metrics<H, S, P>(
+    State(state): State<AppState<H, S, P>>,
 ) -> std::result::Result<String, ApiError> {
     let encoder = TextEncoder::new();
     let families = state.registry.gather();
@@ -296,6 +334,13 @@ struct IndexRange {
     from: Option<String>,
     #[param(example = "2026-05-31T00:00:00Z")]
     to: Option<String>,
+}
+
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+struct SearchQuery {
+    #[param(example = "blorp")]
+    q: String,
 }
 
 #[derive(Serialize, ToSchema)]
