@@ -145,13 +145,14 @@ impl IndexOverTime {
         // OHLC) carry the last known close forward.
         let mut prev_close: Option<SnapshotIndex> = None;
         while bucket <= last {
-            let ohlc = ohlc_by_hour
-                .get(&bucket.unix_timestamp())
-                .copied()
-                .map(|o| match prev_close {
-                    Some(open) => o.with_open(open),
-                    None => o,
-                });
+            let ohlc =
+                ohlc_by_hour
+                    .get(&bucket.unix_timestamp())
+                    .copied()
+                    .map(|o| match prev_close {
+                        Some(open) => o.with_open(open),
+                        None => o,
+                    });
             if let Some(o) = ohlc {
                 prev_close = Some(o.close());
             }
@@ -504,7 +505,11 @@ mod tests {
             dt(base),
             dt(base + 2 * HOUR),
             // hour0: close 1000, hour2: a single sample at 5000.
-            vec![snap(base, 4, 2), snap(base + 600, 2, 2), snap(base + 2 * HOUR, 10, 2)],
+            vec![
+                snap(base, 4, 2),
+                snap(base + 600, 2, 2),
+                snap(base + 2 * HOUR, 10, 2),
+            ],
         )
         .unwrap();
         let candles = series.candles();
