@@ -586,10 +586,31 @@ a.section-head-name:hover {
   box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
+/* Emoji stays vertically centered, but the text block fills the card height and
+   spreads its rows: WIRED/TIRED at the top (level with the top-right date) and
+   the meta line at the bottom, so the top and bottom gaps match. */
+.contender.champion .contender-body {
+  align-self: stretch;
+  justify-content: space-between;
+}
+
+/* idx pinned left, comments/points pinned right (inherits the base
+   space-between). */
+
 .contender-emoji {
   font-size: 56px;
   line-height: 1;
   flex: none;
+}
+
+.contender.champion .contender-emoji {
+  font-size: 66px;
+}
+
+/* Champion is tall: scale the title up so its two reserved lines fill the card
+   instead of leaving a gap. (height stays 2.6em, so it tracks the font size.) */
+.contender.champion .contender-title {
+  font-size: 19px;
 }
 
 /* Challengers: emoji sits inline to the left of the body, scaled down. */
@@ -597,6 +618,22 @@ a.section-head-name:hover {
   flex-direction: row;
   align-items: center;
   gap: 10px;
+}
+
+/* Challengers carry a #rank label top-left, mirroring the carousel's source
+   line and the champion's WIRED/TIRED — it guards the top row so the absolute
+   date no longer lands on the title. To keep three rows inside the fixed 76px
+   card, the challenger title is a single line. */
+.contender:not(.champion) .contender-title {
+  height: 1.3em;
+  -webkit-line-clamp: 1;
+}
+
+/* The #rank label is just a position marker, not a banner like WIRED/TIRED —
+   keep it muted grey, no accent glow. */
+.contender:not(.champion) .contender-label {
+  color: var(--muted);
+  text-shadow: none;
 }
 
 .contender-emoji--sm {

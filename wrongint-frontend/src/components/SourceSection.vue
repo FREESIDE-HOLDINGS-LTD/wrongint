@@ -2,6 +2,7 @@
 import { defineComponent, type PropType } from 'vue'
 import IndexChart from './IndexChart.vue'
 import DirArrows from './DirArrows.vue'
+import PostCard from './PostCard.vue'
 import {
   indexSymbol,
   sourceLabel,
@@ -46,7 +47,7 @@ function recentCloses(candles: IndexCandles | null): number[] {
 
 export default defineComponent({
   name: 'SourceSection',
-  components: { IndexChart, DirArrows },
+  components: { IndexChart, DirArrows, PostCard },
   props: {
     source: { type: String, required: true },
     candles: { type: Object as PropType<IndexCandles | null>, default: null },
@@ -117,29 +118,6 @@ export default defineComponent({
     },
   },
   methods: {
-    fmt(v: number | null): string {
-      return v == null ? '——' : v.toFixed(0)
-    },
-    fmtDate(iso: string): string {
-      const d = new Date(iso)
-      if (isNaN(d.getTime())) return ''
-      const secs = (d.getTime() - Date.now()) / 1000
-      const units: [Intl.RelativeTimeFormatUnit, number][] = [
-        ['year', 31536000],
-        ['month', 2592000],
-        ['day', 86400],
-        ['hour', 3600],
-        ['minute', 60],
-        ['second', 1],
-      ]
-      const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-      for (const [unit, s] of units) {
-        if (Math.abs(secs) >= s || unit === 'second') {
-          return rtf.format(Math.round(secs / s), unit)
-        }
-      }
-      return ''
-    },
     accent(post: Post | null): string {
       return accent(heat(post?.index, this.range))
     },
@@ -188,24 +166,16 @@ export default defineComponent({
              the fold at the bottom. -->
         <div class="column column--outer">
           <template v-for="(c, i) in wiredCols.outer" :key="c.post.id">
-            <a
-              class="contender"
-              :class="{ hot: hot(c.post) }"
-              :style="{ '--accent': accent(c.post), opacity: dim(c.rank) }"
-              :href="c.post.comments_url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span class="contender-emoji contender-emoji--sm" aria-hidden="true">{{ emoji(c.post) }}</span>
-              <span class="contender-body">
-                <span class="contender-title">{{ c.post.title }}</span>
-                <span class="contender-meta">
-                  <span class="contender-idx">idx {{ fmt(c.post.index) }}</span>
-                  <span class="contender-cs">{{ c.post.comments }} comments / {{ c.post.score }} points</span>
-                </span>
-                <span class="contender-date">{{ fmtDate(c.post.posted_at) }}</span>
-              </span>
-            </a>
+            <PostCard
+              kind="contender"
+              sm
+              :post="c.post"
+              :label="'#' + c.rank"
+              :accent="accent(c.post)"
+              :hot="hot(c.post)"
+              :emoji="emoji(c.post)"
+              :style="{ opacity: dim(c.rank) }"
+            />
             <span v-if="i < wiredCols.outer.length - 1" class="advance advance--down" aria-hidden="true">➤</span>
           </template>
         </div>
@@ -216,24 +186,16 @@ export default defineComponent({
         <div class="column column--inner">
           <template v-for="(c, i) in wiredCols.inner" :key="c.post.id">
             <span v-if="i > 0" class="advance advance--up" aria-hidden="true">➤</span>
-            <a
-              class="contender"
-              :class="{ hot: hot(c.post) }"
-              :style="{ '--accent': accent(c.post), opacity: dim(c.rank) }"
-              :href="c.post.comments_url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span class="contender-emoji contender-emoji--sm" aria-hidden="true">{{ emoji(c.post) }}</span>
-              <span class="contender-body">
-                <span class="contender-title">{{ c.post.title }}</span>
-                <span class="contender-meta">
-                  <span class="contender-idx">idx {{ fmt(c.post.index) }}</span>
-                  <span class="contender-cs">{{ c.post.comments }} comments / {{ c.post.score }} points</span>
-                </span>
-                <span class="contender-date">{{ fmtDate(c.post.posted_at) }}</span>
-              </span>
-            </a>
+            <PostCard
+              kind="contender"
+              sm
+              :post="c.post"
+              :label="'#' + c.rank"
+              :accent="accent(c.post)"
+              :hot="hot(c.post)"
+              :emoji="emoji(c.post)"
+              :style="{ opacity: dim(c.rank) }"
+            />
           </template>
         </div>
         <!-- Inner column's strongest contender charges into the champion. -->
@@ -244,26 +206,15 @@ export default defineComponent({
            width matches the chart; the flanks fill the outer margins. -->
       <div class="arena">
         <div class="champions">
-          <a
+          <PostCard
             v-if="wiredChampion"
-            class="contender champion"
-            :class="{ hot: hot(wiredChampion) }"
-            :style="{ '--accent': accent(wiredChampion) }"
-            :href="wiredChampion.comments_url"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span class="contender-emoji" aria-hidden="true">{{ emoji(wiredChampion) }}</span>
-            <span class="contender-body">
-              <span class="contender-label">WIRED</span>
-              <span class="contender-title">{{ wiredChampion.title }}</span>
-              <span class="contender-meta">
-                <span class="contender-idx">idx {{ fmt(wiredChampion.index) }}</span>
-                <span class="contender-cs">{{ wiredChampion.comments }} comments / {{ wiredChampion.score }} points</span>
-              </span>
-              <span class="contender-date">{{ fmtDate(wiredChampion.posted_at) }}</span>
-            </span>
-          </a>
+            kind="champion"
+            label="WIRED"
+            :post="wiredChampion"
+            :accent="accent(wiredChampion)"
+            :hot="hot(wiredChampion)"
+            :emoji="emoji(wiredChampion)"
+          />
 
           <!-- The clash: the two champions meeting in the middle, lightning
                arcing between them, sparks flying. -->
@@ -277,26 +228,15 @@ export default defineComponent({
             <span class="clash-core">⚡</span>
           </div>
 
-          <a
+          <PostCard
             v-if="tiredChampion"
-            class="contender champion"
-            :class="{ hot: hot(tiredChampion) }"
-            :style="{ '--accent': accent(tiredChampion) }"
-            :href="tiredChampion.comments_url"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span class="contender-emoji" aria-hidden="true">{{ emoji(tiredChampion) }}</span>
-            <span class="contender-body">
-              <span class="contender-label">TIRED</span>
-              <span class="contender-title">{{ tiredChampion.title }}</span>
-              <span class="contender-meta">
-                <span class="contender-idx">idx {{ fmt(tiredChampion.index) }}</span>
-                <span class="contender-cs">{{ tiredChampion.comments }} comments / {{ tiredChampion.score }} points</span>
-              </span>
-              <span class="contender-date">{{ fmtDate(tiredChampion.posted_at) }}</span>
-            </span>
-          </a>
+            kind="champion"
+            label="TIRED"
+            :post="tiredChampion"
+            :accent="accent(tiredChampion)"
+            :hot="hot(tiredChampion)"
+            :emoji="emoji(tiredChampion)"
+          />
         </div>
         <IndexChart :source="source" :candles="candles" :height="320" :head="false" />
       </div>
@@ -309,48 +249,32 @@ export default defineComponent({
         <div class="column column--inner">
           <template v-for="(c, i) in tiredCols.inner" :key="c.post.id">
             <span v-if="i > 0" class="advance advance--up" aria-hidden="true">➤</span>
-            <a
-              class="contender"
-              :class="{ hot: hot(c.post) }"
-              :style="{ '--accent': accent(c.post), opacity: dim(c.rank) }"
-              :href="c.post.comments_url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span class="contender-emoji contender-emoji--sm" aria-hidden="true">{{ emoji(c.post) }}</span>
-              <span class="contender-body">
-                <span class="contender-title">{{ c.post.title }}</span>
-                <span class="contender-meta">
-                  <span class="contender-idx">idx {{ fmt(c.post.index) }}</span>
-                  <span class="contender-cs">{{ c.post.comments }} comments / {{ c.post.score }} points</span>
-                </span>
-                <span class="contender-date">{{ fmtDate(c.post.posted_at) }}</span>
-              </span>
-            </a>
+            <PostCard
+              kind="contender"
+              sm
+              :post="c.post"
+              :label="'#' + c.rank"
+              :accent="accent(c.post)"
+              :hot="hot(c.post)"
+              :emoji="emoji(c.post)"
+              :style="{ opacity: dim(c.rank) }"
+            />
           </template>
         </div>
         <!-- The fold: outer column hands off to the inner column at the bottom. -->
         <span v-if="tiredCols.outer.length" class="advance advance--left advance--fold" aria-hidden="true">➤</span>
         <div class="column column--outer">
           <template v-for="(c, i) in tiredCols.outer" :key="c.post.id">
-            <a
-              class="contender"
-              :class="{ hot: hot(c.post) }"
-              :style="{ '--accent': accent(c.post), opacity: dim(c.rank) }"
-              :href="c.post.comments_url"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <span class="contender-emoji contender-emoji--sm" aria-hidden="true">{{ emoji(c.post) }}</span>
-              <span class="contender-body">
-                <span class="contender-title">{{ c.post.title }}</span>
-                <span class="contender-meta">
-                  <span class="contender-idx">idx {{ fmt(c.post.index) }}</span>
-                  <span class="contender-cs">{{ c.post.comments }} comments / {{ c.post.score }} points</span>
-                </span>
-                <span class="contender-date">{{ fmtDate(c.post.posted_at) }}</span>
-              </span>
-            </a>
+            <PostCard
+              kind="contender"
+              sm
+              :post="c.post"
+              :label="'#' + c.rank"
+              :accent="accent(c.post)"
+              :hot="hot(c.post)"
+              :emoji="emoji(c.post)"
+              :style="{ opacity: dim(c.rank) }"
+            />
             <span v-if="i < tiredCols.outer.length - 1" class="advance advance--down" aria-hidden="true">➤</span>
           </template>
         </div>

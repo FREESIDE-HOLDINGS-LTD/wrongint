@@ -1,6 +1,7 @@
 <script lang="ts">
 import { defineComponent, type PropType } from 'vue'
 import { Vue3Marquee } from 'vue3-marquee'
+import PostCard from './PostCard.vue'
 import { sourceLabel, type Post } from '../api'
 import { rangeOf, heat, accent, isHot, emoji, type Range } from '../heat'
 
@@ -10,7 +11,7 @@ export interface CarouselPost extends Post {
 
 export default defineComponent({
   name: 'PostsCarousel',
-  components: { Vue3Marquee },
+  components: { Vue3Marquee, PostCard },
   props: {
     posts: { type: Array as PropType<CarouselPost[]>, default: () => [] },
   },
@@ -26,29 +27,6 @@ export default defineComponent({
   },
   methods: {
     sourceLabel,
-    fmt(v: number | null): string {
-      return v == null ? '——' : v.toFixed(0)
-    },
-    fmtDate(iso: string): string {
-      const d = new Date(iso)
-      if (isNaN(d.getTime())) return ''
-      const secs = (d.getTime() - Date.now()) / 1000
-      const units: [Intl.RelativeTimeFormatUnit, number][] = [
-        ['year', 31536000],
-        ['month', 2592000],
-        ['day', 86400],
-        ['hour', 3600],
-        ['minute', 60],
-        ['second', 1],
-      ]
-      const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-      for (const [unit, s] of units) {
-        if (Math.abs(secs) >= s || unit === 'second') {
-          return rtf.format(Math.round(secs / s), unit)
-        }
-      }
-      return ''
-    },
     accent(p: CarouselPost): string {
       return accent(heat(p.index, this.ranges[p.source] ?? null))
     },
@@ -70,26 +48,15 @@ export default defineComponent({
     :clone="true"
     :pause-on-hover="true"
   >
-    <a
+    <PostCard
       v-for="p in posts"
       :key="p.id"
-      class="card"
-      :class="{ hot: hot(p) }"
-      :style="{ '--accent': accent(p) }"
-      :href="p.comments_url"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      <span class="card-emoji" aria-hidden="true">{{ emoji(p) }}</span>
-      <span class="card-body">
-        <span class="card-src">{{ sourceLabel(p.source) }}</span>
-        <span class="card-title">{{ p.title }}</span>
-        <span class="card-meta">
-          <span class="card-idx">idx {{ fmt(p.index) }}</span>
-          <span class="card-cs">{{ p.comments }} comments / {{ p.score }} points</span>
-        </span>
-        <span class="card-date">{{ fmtDate(p.posted_at) }}</span>
-      </span>
-    </a>
+      kind="carousel"
+      :post="p"
+      :accent="accent(p)"
+      :hot="hot(p)"
+      :emoji="emoji(p)"
+      :label="sourceLabel(p.source)"
+    />
   </Vue3Marquee>
 </template>
