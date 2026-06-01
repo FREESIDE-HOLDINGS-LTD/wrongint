@@ -3,7 +3,7 @@
   /* Fluid scale lever: every dimension below is in rem, so the whole UI scales
      continuously with viewport width. ~16px at >=2000px wide, ramping down to a
      10px floor on narrow screens. No breakpoints, no jumps. */
-  font-size: clamp(10px, 0.5vw + 6px, 16px);
+  font-size: clamp(8px, 0.7vw + 2px, 16px);
   --bg: #05060a;
   --panel: #0b0f17;
   --neon: #39ff14;
