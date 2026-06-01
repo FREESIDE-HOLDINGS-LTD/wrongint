@@ -138,8 +138,23 @@ impl IndexOverTime {
         let last = to.truncate_to_hour()?;
 
         let mut candles = Vec::new();
+        // Snapshots are sampled at discrete points, so a candle's first sample
+        // does not line up with the previous candle's last sample, leaving gaps
+        // between close and the next open. Chain each open to the previous
+        // candle's close to keep the series continuous. Gaps (candles without an
+        // OHLC) carry the last known close forward.
+        let mut prev_close: Option<SnapshotIndex> = None;
         while bucket <= last {
-            let ohlc = ohlc_by_hour.get(&bucket.unix_timestamp()).copied();
+            let ohlc = ohlc_by_hour
+                .get(&bucket.unix_timestamp())
+                .copied()
+                .map(|o| match prev_close {
+                    Some(open) => o.with_open(open),
+                    None => o,
+                });
+            if let Some(o) = ohlc {
+                prev_close = Some(o.close());
+            }
             candles.push(IndexCandle {
                 date: bucket.date(),
                 hour: bucket.hour_of_day(),
@@ -196,6 +211,27 @@ impl Ohlc {
             low,
             close,
         })
+    }
+
+    /// Replaces the open with the given value (the previous candle's close) so
+    /// the series is continuous, widening high/low to keep open within range.
+    fn with_open(self, open: SnapshotIndex) -> Ohlc {
+        let high = if open.value() > self.high.value() {
+            open
+        } else {
+            self.high
+        };
+        let low = if open.value() < self.low.value() {
+            open
+        } else {
+            self.low
+        };
+        Ohlc {
+            open,
+            high,
+            low,
+            close: self.close,
+        }
     }
 
     fn mean(candles: &[Ohlc]) -> Option<Ohlc> {
@@ -453,9 +489,40 @@ mod tests {
         assert_eq!(hour0.close().value(), 3000.0);
 
         let hour1 = candles[1].ohlc().unwrap();
-        assert_eq!(hour1.open().value(), 6000.0);
+        // Only hn has an hour1 candle; its open is chained to its hour0 close
+        // (3000 mean is hour0; hn's own hour0 close is 2000).
+        assert_eq!(hour1.open().value(), 2000.0);
+        assert_eq!(hour1.close().value(), 6000.0);
 
         assert_eq!(candles[2].ohlc(), None);
+    }
+
+    #[test]
+    fn fill_chains_open_to_previous_close_across_gaps() {
+        let base = 1_780_000_000;
+        let series = IndexOverTime::from_snapshots(
+            dt(base),
+            dt(base + 2 * HOUR),
+            // hour0: close 1000, hour2: a single sample at 5000.
+            vec![snap(base, 4, 2), snap(base + 600, 2, 2), snap(base + 2 * HOUR, 10, 2)],
+        )
+        .unwrap();
+        let candles = series.candles();
+        assert_eq!(candles.len(), 3);
+
+        let hour0 = candles[0].ohlc().unwrap();
+        assert_eq!(hour0.open().value(), 2000.0);
+        assert_eq!(hour0.close().value(), 1000.0);
+
+        // hour1 is a gap; hour2's open chains to hour0's close across it.
+        assert_eq!(candles[1].ohlc(), None);
+
+        let hour2 = candles[2].ohlc().unwrap();
+        assert_eq!(hour2.open().value(), 1000.0);
+        assert_eq!(hour2.close().value(), 5000.0);
+        // open below the sample widens the low, high stays the sample value.
+        assert_eq!(hour2.low().value(), 1000.0);
+        assert_eq!(hour2.high().value(), 5000.0);
     }
 
     #[test]
