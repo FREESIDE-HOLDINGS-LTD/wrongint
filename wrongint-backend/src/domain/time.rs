@@ -138,4 +138,8 @@ impl Duration {
     pub fn to_std(&self) -> std::time::Duration {
         self.d.to_std().unwrap_or(std::time::Duration::from_secs(0))
     }
+
+    pub fn as_seconds_f64(&self) -> f64 {
+        self.d.num_milliseconds() as f64 / 1000.0
+    }
 }

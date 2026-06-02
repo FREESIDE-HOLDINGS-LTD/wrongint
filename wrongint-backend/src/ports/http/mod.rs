@@ -257,7 +257,7 @@ where
         return Err(ApiError::BadRequest("'q' must not be empty".into()));
     }
     match state.search.handle(q).await? {
-        Some(post) => Ok(Json(ApiPost::from(&post))),
+        Some(post) => Ok(Json(ApiPost::without_index(&post))),
         None => Err(ApiError::NotFound),
     }
 }
@@ -394,7 +394,11 @@ impl From<&Snapshot> for ApiSnapshot {
         Self {
             source: s.source().to_string(),
             captured_at: s.captured_at().to_rfc3339(),
-            posts: s.posts().iter().map(ApiPost::from).collect(),
+            posts: s
+                .posts()
+                .iter()
+                .map(|p| ApiPost::from_post(p, s.captured_at()))
+                .collect(),
         }
     }
 }
@@ -411,8 +415,15 @@ struct ApiPost {
     index: Option<f64>,
 }
 
-impl From<&Post> for ApiPost {
-    fn from(p: &Post) -> Self {
+impl ApiPost {
+    fn from_post(p: &Post, captured_at: DateTime) -> Self {
+        Self {
+            index: PostIndex::from_post(p, captured_at).map(|i| i.value()),
+            ..Self::without_index(p)
+        }
+    }
+
+    fn without_index(p: &Post) -> Self {
         Self {
             id: p.post_id().as_str().to_string(),
             title: p.title().as_str().to_string(),
@@ -421,7 +432,7 @@ impl From<&Post> for ApiPost {
             posted_at: p.posted_at().to_rfc3339(),
             comments: p.comments().value(),
             score: p.score().net(),
-            index: PostIndex::from_post(p).map(|i| i.value()),
+            index: None,
         }
     }
 }

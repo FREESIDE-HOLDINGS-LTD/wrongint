@@ -268,10 +268,11 @@ pub struct SnapshotIndex {
 
 impl SnapshotIndex {
     pub fn from_snapshot(snapshot: &Snapshot) -> Option<SnapshotIndex> {
+        let captured_at = snapshot.captured_at();
         let indexes: Vec<PostIndex> = snapshot
             .posts()
             .iter()
-            .filter_map(PostIndex::from_post)
+            .filter_map(|post| PostIndex::from_post(post, captured_at))
             .collect();
         Self::from_post_indexes(&indexes)
     }
@@ -311,14 +312,23 @@ pub struct PostIndex {
     value: f64,
 }
 
+const SCALE: f64 = 1000.0;
+const HALF_LIFE_HOURS: f64 = 24.0;
+
 impl PostIndex {
-    pub fn from_post(post: &Post) -> Option<PostIndex> {
+    pub fn from_post(post: &Post, captured_at: DateTime) -> Option<PostIndex> {
         let score = post.score().net();
         if score <= 0 {
             return None;
         }
+        let age_hours = (captured_at - post.posted_at()).as_seconds_f64() / 3600.0;
+        if age_hours < 0.0 {
+            return None;
+        }
+        let base = post.comments().value() as f64 / score as f64 * SCALE;
+        let decay = 0.5_f64.powf(age_hours / HALF_LIFE_HOURS);
         Some(PostIndex {
-            value: post.comments().value() as f64 / score as f64 * 1000.0,
+            value: base * decay,
         })
     }
 
@@ -340,20 +350,25 @@ mod tests {
         DateTime::new_from_unix_timestamp(unix).unwrap()
     }
 
-    fn post(comments: i64, score: i64) -> Post {
+    fn post_at(comments: i64, score: i64, posted_at: DateTime) -> Post {
         Post::new(
             SourceId::HackerNews,
             PostId::new("x").unwrap(),
             PostTitle::new("t").unwrap(),
             Some(ExternalUrl::new("u").unwrap()),
-            DateTime::now(),
+            posted_at,
             PostComments::new(comments).unwrap(),
             PostScore::Points(Points::new(score).unwrap()),
         )
     }
 
     fn snap(unix: i64, comments: i64, score: i64) -> Snapshot {
-        Snapshot::new(SourceId::HackerNews, dt(unix), vec![post(comments, score)]).unwrap()
+        Snapshot::new(
+            SourceId::HackerNews,
+            dt(unix),
+            vec![post_at(comments, score, dt(unix))],
+        )
+        .unwrap()
     }
 
     fn index(comments: i64, score: i64) -> SnapshotIndex {
@@ -362,20 +377,40 @@ mod tests {
 
     #[test]
     fn post_index_is_comments_over_net_score() {
-        let p = post(6, 2);
-        assert_eq!(PostIndex::from_post(&p).map(|i| i.value()), Some(3000.0));
+        let p = post_at(6, 2, dt(0));
+        assert_eq!(
+            PostIndex::from_post(&p, dt(0)).map(|i| i.value()),
+            Some(3000.0)
+        );
     }
 
     #[test]
     fn post_index_none_when_score_nonpositive() {
-        let p = post(6, 0);
-        assert_eq!(PostIndex::from_post(&p), None);
+        let p = post_at(6, 0, dt(0));
+        assert_eq!(PostIndex::from_post(&p, dt(0)), None);
+    }
+
+    #[test]
+    fn post_index_decays_with_age() {
+        let p = post_at(6, 2, dt(0));
+        let one_half_life = PostIndex::from_post(&p, dt(24 * HOUR)).unwrap();
+        assert_eq!(one_half_life.value(), 1500.0);
+    }
+
+    #[test]
+    fn post_index_none_when_captured_before_posted() {
+        let p = post_at(6, 2, dt(HOUR));
+        assert_eq!(PostIndex::from_post(&p, dt(0)), None);
     }
 
     #[test]
     fn snapshot_index_averages_post_indexes() {
-        let snap =
-            Snapshot::new(SourceId::HackerNews, dt(0), vec![post(2, 2), post(6, 2)]).unwrap();
+        let snap = Snapshot::new(
+            SourceId::HackerNews,
+            dt(0),
+            vec![post_at(2, 2, dt(0)), post_at(6, 2, dt(0))],
+        )
+        .unwrap();
         assert_eq!(
             SnapshotIndex::from_snapshot(&snap).map(|i| i.value()),
             Some(2000.0)
@@ -384,8 +419,12 @@ mod tests {
 
     #[test]
     fn snapshot_index_skips_nonpositive_posts() {
-        let snap =
-            Snapshot::new(SourceId::HackerNews, dt(0), vec![post(6, 0), post(8, 2)]).unwrap();
+        let snap = Snapshot::new(
+            SourceId::HackerNews,
+            dt(0),
+            vec![post_at(6, 0, dt(0)), post_at(8, 2, dt(0))],
+        )
+        .unwrap();
         assert_eq!(
             SnapshotIndex::from_snapshot(&snap).map(|i| i.value()),
             Some(4000.0)
@@ -394,7 +433,8 @@ mod tests {
 
     #[test]
     fn snapshot_index_none_when_all_posts_nonpositive() {
-        let snap = Snapshot::new(SourceId::HackerNews, dt(0), vec![post(6, 0)]).unwrap();
+        let snap =
+            Snapshot::new(SourceId::HackerNews, dt(0), vec![post_at(6, 0, dt(0))]).unwrap();
         assert_eq!(SnapshotIndex::from_snapshot(&snap), None);
     }
 
