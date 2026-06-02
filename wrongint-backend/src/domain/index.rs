@@ -74,21 +74,41 @@ impl IndexOverTime {
         Self::fill(from, to, &ohlc_by_hour)
     }
 
+    // Pool per-hour candles across sources into their mean. A source that has a
+    // gap at an hour carries its last known close forward (a flat candle) so the
+    // global keeps reflecting that source's level instead of collapsing onto
+    // whichever source happens to have data that hour. A source contributes
+    // nothing until its first real candle.
     pub fn from_sources(sources: Vec<IndexOverTime>) -> IndexOverTime {
         let len = sources.iter().map(|s| s.candles.len()).max().unwrap_or(0);
         let mut candles = Vec::with_capacity(len);
+        let mut last_close: Vec<Option<SnapshotIndex>> = vec![None; sources.len()];
         for i in 0..len {
-            let at: Vec<IndexCandle> = sources
-                .iter()
-                .filter_map(|s| s.candles.get(i).copied())
-                .collect();
-            let Some(first) = at.first() else {
+            let mut date_hour: Option<(Date, u32)> = None;
+            let mut ohlcs: Vec<Ohlc> = Vec::new();
+            for (s, source) in sources.iter().enumerate() {
+                let Some(candle) = source.candles.get(i) else {
+                    continue;
+                };
+                date_hour.get_or_insert((candle.date, candle.hour));
+                match candle.ohlc {
+                    Some(ohlc) => {
+                        last_close[s] = Some(ohlc.close());
+                        ohlcs.push(ohlc);
+                    }
+                    None => {
+                        if let Some(close) = last_close[s] {
+                            ohlcs.push(Ohlc::flat(close));
+                        }
+                    }
+                }
+            }
+            let Some((date, hour)) = date_hour else {
                 continue;
             };
-            let ohlcs: Vec<Ohlc> = at.iter().filter_map(|c| c.ohlc).collect();
             candles.push(IndexCandle {
-                date: first.date,
-                hour: first.hour,
+                date,
+                hour,
                 ohlc: Ohlc::mean(&ohlcs),
             });
         }
@@ -141,8 +161,8 @@ impl IndexOverTime {
         // Snapshots are sampled at discrete points, so a candle's first sample
         // does not line up with the previous candle's last sample, leaving gaps
         // between close and the next open. Chain each open to the previous
-        // candle's close to keep the series continuous. Gaps (candles without an
-        // OHLC) carry the last known close forward.
+        // candle's close to keep the series continuous. Hours with no samples
+        // stay empty (ohlc None); pooling forward-fills them across sources.
         let mut prev_close: Option<SnapshotIndex> = None;
         while bucket <= last {
             let ohlc =
@@ -232,6 +252,15 @@ impl Ohlc {
             high,
             low,
             close: self.close,
+        }
+    }
+
+    fn flat(value: SnapshotIndex) -> Ohlc {
+        Ohlc {
+            open: value,
+            high: value,
+            low: value,
+            close: value,
         }
     }
 
@@ -468,17 +497,19 @@ mod tests {
     }
 
     #[test]
-    fn from_sources_means_candles_and_skips_absent_source() {
+    fn from_sources_forward_fills_a_gap_with_the_sources_last_close() {
         let base = 1_780_000_000;
         let from = dt(base);
         let to = dt(base + 2 * HOUR);
 
+        // hn has hour0 (close 2000) and hour1 (close 6000), then a gap at hour2.
         let hn = IndexOverTime::from_snapshots(
             from,
             to,
             vec![snap(base, 4, 2), snap(base + HOUR, 12, 2)],
         )
         .unwrap();
+        // lobsters has only hour0 (close 4000), then gaps at hour1 and hour2.
         let lobsters = IndexOverTime::from_snapshots(from, to, vec![snap(base, 8, 2)]).unwrap();
 
         let global = IndexOverTime::from_sources(vec![hn, lobsters]);
@@ -489,13 +520,38 @@ mod tests {
         assert_eq!(hour0.open().value(), 3000.0);
         assert_eq!(hour0.close().value(), 3000.0);
 
+        // hour1: hn open 2000 / close 6000, lobsters forward-filled flat at 4000.
         let hour1 = candles[1].ohlc().unwrap();
-        // Only hn has an hour1 candle; its open is chained to its hour0 close
-        // (3000 mean is hour0; hn's own hour0 close is 2000).
-        assert_eq!(hour1.open().value(), 2000.0);
-        assert_eq!(hour1.close().value(), 6000.0);
+        assert_eq!(hour1.open().value(), 3000.0);
+        assert_eq!(hour1.close().value(), 5000.0);
 
-        assert_eq!(candles[2].ohlc(), None);
+        // hour2: both sources gapped; each forward-fills its last close (hn 6000,
+        // lobsters 4000), so the global holds their mean instead of dropping out.
+        let hour2 = candles[2].ohlc().unwrap();
+        assert_eq!(hour2.open().value(), 5000.0);
+        assert_eq!(hour2.close().value(), 5000.0);
+    }
+
+    #[test]
+    fn from_sources_ignores_a_source_until_its_first_candle() {
+        let base = 1_780_000_000;
+        let from = dt(base);
+        let to = dt(base + HOUR);
+
+        // hn has hour0 only; lobsters starts at hour1. hour0 must be hn alone,
+        // not blended with a non-existent lobsters value.
+        let hn = IndexOverTime::from_snapshots(from, to, vec![snap(base, 4, 2)]).unwrap();
+        let lobsters =
+            IndexOverTime::from_snapshots(from, to, vec![snap(base + HOUR, 16, 2)]).unwrap();
+
+        let global = IndexOverTime::from_sources(vec![hn, lobsters]);
+        let candles = global.candles();
+        assert_eq!(candles.len(), 2);
+
+        // hour0: lobsters has not started, so global is hn alone (2000).
+        assert_eq!(candles[0].ohlc().unwrap().close().value(), 2000.0);
+        // hour1: hn forward-filled (2000) blended with lobsters' first close (8000).
+        assert_eq!(candles[1].ohlc().unwrap().close().value(), 5000.0);
     }
 
     #[test]
