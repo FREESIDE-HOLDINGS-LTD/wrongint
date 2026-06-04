@@ -80,6 +80,7 @@ export default defineComponent({
     :class="rootClass"
     :style="{ '--accent': accent }"
     :href="post.comments_url"
+    :title="post.title"
     target="_blank"
     rel="noopener noreferrer"
   >
